@@ -24,14 +24,14 @@ let steamid = SteamID::parse_steam2id("STEAM_0:0:12345")?;
 let steamid = SteamID::parse_steam3id("[U:1:12345]")?;
 ```
 
-### steam64id to steam2id
+### Convert steam64id to steam2id
 ```rust
 # use steamid::SteamID;
 let steamid = SteamID::new(76561198181797231);
 let steam2id = steamid.steam2id()?;
 ```
 
-### steam64id to steam3id
+### Convert steam64id to steam3id
 ```rust
 # use steamid::SteamID;
 let steamid = SteamID::new(76561198181797231);

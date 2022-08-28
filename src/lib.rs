@@ -1,37 +1,37 @@
 //! # Steam ID type and accessories
-//! 
+//!
 //! This project provides the `SteamID` type with conversion methods to convert between different Steam ID formats.
-//! 
+//!
 //! Hosted on [GitHub](https://github.com/JohnPeel/steamid-rs).
-//! 
+//!
 //! ## Examples and Usage
-//! 
+//!
 //! ### Initialize from steam64id
 //! ```rust
 //! # use steamid::SteamID;
 //! let steamid = SteamID::new(76561198181797231);
 //! ```
-//! 
+//!
 //! ### Parse a steam2id
 //! ```rust
 //! # use steamid::SteamID;
 //! let steamid = SteamID::parse_steam2id("STEAM_0:0:12345")?;
 //! ```
-//! 
+//!
 //! ### Parse a steam3id
 //! ```rust
 //! # use steamid::SteamID;
 //! let steamid = SteamID::parse_steam3id("[U:1:12345]")?;
 //! ```
-//! 
-//! ### steam64id to steam2id
+//!
+//! ### Convert steam64id to steam2id
 //! ```rust
 //! # use steamid::SteamID;
 //! let steamid = SteamID::new(76561198181797231);
 //! let steam2id = steamid.steam2id()?;
 //! ```
-//! 
-//! //! ### steam64id to steam3id
+//!
+//! ### Convert steam64id to steam3id
 //! ```rust
 //! # use steamid::SteamID;
 //! let steamid = SteamID::new(76561198181797231);
@@ -39,7 +39,12 @@
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![warn(missing_crate_level_docs, missing_docs, private_doc_tests, clippy::pedantic)]
+#![warn(
+    missing_crate_level_docs,
+    missing_docs,
+    private_doc_tests,
+    clippy::pedantic
+)]
 #![deny(unsafe_code)]
 
 extern crate alloc;
@@ -460,7 +465,7 @@ impl From<Infallible> for InvalidSteamID {
 
 impl AccountId {
     /// Returns the `AccountNumber` of the `AccountId`.
-    /// 
+    ///
     /// # Errors
     /// Returns `InvalidAccountNumber` if the account number is invalid.
     pub fn account_number(&self) -> Result<AccountNumber, InvalidAccountNumber> {
@@ -477,7 +482,7 @@ impl SteamID {
     }
 
     /// Returns the `Universe` of the `SteamID`.
-    /// 
+    ///
     /// # Errors
     /// Returns `InvalidUniverse` if the universe is invalid.
     pub fn universe(&self) -> Result<Universe, InvalidUniverse> {
@@ -485,7 +490,7 @@ impl SteamID {
     }
 
     /// Returns the account type of the `SteamID`.
-    /// 
+    ///
     /// # Errors
     /// Returns `InvalidAccountType` if the account type is invalid.
     pub fn account_type(&self) -> Result<AccountType, InvalidAccountType> {
@@ -493,7 +498,7 @@ impl SteamID {
     }
 
     /// Returns the instance of the `SteamID`.
-    /// 
+    ///
     /// # Errors
     /// Returns `InvalidInstance` if the instance is invalid.
     pub fn instance(&self) -> Result<Instance, InvalidInstance> {
@@ -501,7 +506,7 @@ impl SteamID {
     }
 
     /// Returns the `AccountNumber` of the `SteamID`.
-    /// 
+    ///
     /// # Errors
     /// Returns `InvalidAccountNumber` if the account number is invalid.
     pub fn account_number(&self) -> Result<AccountNumber, InvalidAccountNumber> {
@@ -509,7 +514,7 @@ impl SteamID {
     }
 
     /// Returns the `AccountId` of the `SteamID`.
-    /// 
+    ///
     /// # Errors
     /// This method is currently infallible, but may return an error in the future.
     pub fn account_id(&self) -> Result<AccountId, Infallible> {
@@ -517,7 +522,7 @@ impl SteamID {
     }
 
     /// Returns the steam2id representation of the `SteamID`.
-    /// 
+    ///
     /// # Errors
     /// Returns `InvalidSteamID` if the `SteamID` is invalid.
     pub fn steam2id(&self) -> Result<String, InvalidSteamID> {
@@ -530,7 +535,7 @@ impl SteamID {
     }
 
     /// Returns the steam3id representation of the `SteamID`.
-    /// 
+    ///
     /// # Errors
     /// Returns `InvalidSteamID` if the `SteamID` is invalid.
     pub fn steam3id(&self) -> Result<String, InvalidSteamID> {
@@ -549,7 +554,7 @@ impl SteamID {
     }
 
     /// Parse steam2id into a `SteamID`.
-    /// 
+    ///
     /// # Errors
     /// Returns `InvalidSteamID` if the steam2id is invalid.
     pub fn parse_steam2id<S: AsRef<str>>(
@@ -582,7 +587,7 @@ impl SteamID {
     }
 
     /// Parse steam3id into a `SteamID`.
-    /// 
+    ///
     /// # Errors
     /// Returns `InvalidSteamID` if the steam3id is invalid.
     pub fn parse_steam3id<S: AsRef<str>>(
