@@ -51,7 +51,7 @@ jobs:
       with:
         toolchain: stable
         override: true
-        components: rustfmt clippy-preview
+        components: rustfmt, clippy
     - uses: actions-rs/cargo@v1
       with:
         command: fmt
