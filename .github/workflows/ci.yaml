@@ -1,4 +1,4 @@
-name: Clippy
+name: CI
 
 on:
   push:

@@ -14,35 +14,47 @@
 //!
 //! ### Parse a steam2id
 //! ```rust
-//! # use steamid::SteamID;
-//! let steamid = SteamID::parse_steam2id("STEAM_0:0:12345")?;
+//! # use steamid::{SteamID, AccountType, Instance};
+//! # fn main() -> Result<(), steamid::InvalidSteamID> {
+//! let steamid = SteamID::parse_steam2id("STEAM_0:0:12345", AccountType::Individual, Instance::Desktop)?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ### Parse a steam3id
 //! ```rust
-//! # use steamid::SteamID;
-//! let steamid = SteamID::parse_steam3id("[U:1:12345]")?;
+//! # use steamid::{SteamID, Instance};
+//! # fn main() -> Result<(), steamid::InvalidSteamID> {
+//! let steamid = SteamID::parse_steam3id("[U:1:12345]", Instance::Desktop)?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ### Convert steam64id to steam2id
 //! ```rust
 //! # use steamid::SteamID;
+//! # fn main() -> Result<(), steamid::InvalidSteamID> {
 //! let steamid = SteamID::new(76561198181797231);
 //! let steam2id = steamid.steam2id()?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ### Convert steam64id to steam3id
 //! ```rust
 //! # use steamid::SteamID;
+//! # fn main() -> Result<(), steamid::InvalidSteamID> {
 //! let steamid = SteamID::new(76561198181797231);
 //! let steam3id = steamid.steam3id()?;
+//! # Ok(())
+//! # }
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![warn(
-    missing_crate_level_docs,
     missing_docs,
-    private_doc_tests,
+    rustdoc::missing_crate_level_docs,
+    rustdoc::private_doc_tests,
     clippy::pedantic
 )]
 #![deny(unsafe_code)]
