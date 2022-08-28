@@ -31,7 +31,7 @@ let steamid = SteamID::new(76561198181797231);
 let steam2id = steamid.steam2id()?;
 ```
 
-//! ### steam64id to steam3id
+### steam64id to steam3id
 ```rust
 # use steamid::SteamID;
 let steamid = SteamID::new(76561198181797231);
