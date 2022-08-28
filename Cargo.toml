@@ -1,7 +1,14 @@
 [package]
-name = "steam-utils"
+name = "steamid"
 version = "0.1.0"
+authors = ["John Peel <john@dgby.org>"]
+categories = ["no-std"]
+description = "Steam ID type and accessories"
 edition = "2021"
+keywords = ["steam", "steamid", "steam-id"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/JohnPeel/steamid-rs"
 
 [features]
 default = ["std"]
