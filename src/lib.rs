@@ -1,6 +1,6 @@
 //! # Steam ID type and accessories
 //!
-//! This project provides the `SteamID` type with conversion methods to convert between different Steam ID formats.
+//! This project provides the `SteamId` type with conversion methods to convert between different Steam Id formats.
 //!
 //! Hosted on [GitHub](https://github.com/JohnPeel/steamid-rs).
 //!
@@ -8,48 +8,50 @@
 //!
 //! ### Initialize from steam64id
 //! ```rust
-//! # use steamid::SteamID;
-//! let steamid = SteamID::new(76561198181797231);
+//! # use steamid::{SteamId, Error};
+//! # fn main() -> Result<(), Error> {
+//! let steamid = SteamId::new(76561198181797231)?;
+//! #   Ok(())
+//! # }
 //! ```
 //!
 //! ### Parse a steam2id
 //! ```rust
-//! # use steamid::{SteamID, AccountType, Instance};
-//! # fn main() -> Result<(), steamid::InvalidSteamID> {
-//! let steamid = SteamID::parse_steam2id("STEAM_0:0:12345", AccountType::Individual, Instance::Desktop)?;
+//! # use steamid::{SteamId, AccountType, Instance, Error};
+//! # fn main() -> Result<(), Error> {
+//! let steamid = SteamId::parse_steam2id("STEAM_0:0:12345", AccountType::Individual, Instance::Desktop)?;
 //! # Ok(())
 //! # }
 //! ```
 //!
 //! ### Parse a steam3id
 //! ```rust
-//! # use steamid::{SteamID, Instance};
-//! # fn main() -> Result<(), steamid::InvalidSteamID> {
-//! let steamid = SteamID::parse_steam3id("[U:1:12345]", Instance::Desktop)?;
+//! # use steamid::{SteamId, Instance, Error};
+//! # fn main() -> Result<(), Error> {
+//! let steamid = SteamId::parse_steam3id("[U:1:12345]", Instance::Desktop)?;
 //! # Ok(())
 //! # }
 //! ```
 //!
 //! ### Convert steam64id to steam2id
 //! ```rust
-//! # use steamid::SteamID;
-//! # fn main() -> Result<(), steamid::InvalidSteamID> {
-//! let steamid = SteamID::new(76561198181797231);
-//! let steam2id = steamid.steam2id()?;
+//! # use steamid::{SteamId, Error};
+//! # fn main() -> Result<(), Error> {
+//! let steamid = SteamId::new(76561198181797231)?;
+//! let steam2id = steamid.steam2id();
 //! # Ok(())
 //! # }
 //! ```
 //!
 //! ### Convert steam64id to steam3id
 //! ```rust
-//! # use steamid::SteamID;
-//! # fn main() -> Result<(), steamid::InvalidSteamID> {
-//! let steamid = SteamID::new(76561198181797231);
-//! let steam3id = steamid.steam3id()?;
+//! # use steamid::{SteamId, Error};
+//! # fn main() -> Result<(), Error> {
+//! let steamid = SteamId::new(76561198181797231)?;
+//! let steam3id = steamid.steam3id();
 //! # Ok(())
 //! # }
 //! ```
-
 #![cfg_attr(not(feature = "std"), no_std)]
 #![warn(
     missing_docs,
@@ -59,15 +61,30 @@
 )]
 #![deny(unsafe_code)]
 
+#[cfg(not(feature = "std"))]
 extern crate alloc;
 
-use core::convert::Infallible;
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::String};
 
-use alloc::{fmt, format, string::String};
+use core::convert::TryInto;
 
-/// Representation of an universe.
-#[repr(u8)]
+use derive_more::Into;
+use displaydoc::Display;
+use from_enum::From;
+use num_enum::{IntoPrimitive, TryFromPrimitive, TryFromPrimitiveError};
+
+/// Representation of a Steam id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[repr(transparent)]
+pub struct SteamId(u64);
+
+/// Representation of the universe a `SteamId` is associated with.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(IntoPrimitive, TryFromPrimitive)]
+#[repr(u8)]
 pub enum Universe {
     /// Individual or Unspecified
     Individual = 0,
@@ -83,9 +100,11 @@ pub enum Universe {
     Rc = 5,
 }
 
-/// Representation of an account type.
-#[repr(u8)]
+/// Representation of an account type for a `SteamId`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(IntoPrimitive, TryFromPrimitive)]
+#[repr(u8)]
 pub enum AccountType {
     /// Invalid
     Invalid = 0,
@@ -112,9 +131,11 @@ pub enum AccountType {
 }
 
 // TODO: Support Chat flags.
-/// Representation of an instance.
-#[repr(u32)]
+/// Representation of an instance for a `SteamId`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(IntoPrimitive, TryFromPrimitive)]
+#[repr(u32)]
 pub enum Instance {
     /// All
     All = 0,
@@ -126,133 +147,46 @@ pub enum Instance {
     Web = 3,
 }
 
-/// Representation of an account number.
+/// Representation of an account number for a `SteamId`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Into)]
 pub struct AccountNumber(u32);
 
-/// Representation of an account id.
+/// Representation of an account id for a `SteamId`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Into, derive_more::From)]
 pub struct AccountId(u32);
 
-/// Representation of a Steam id.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SteamID(u64);
+/// Error type for crate.
+#[derive(Debug, Display, From)]
+pub enum Error {
+    /// invalid universe: {0}
+    InvalidUniverse(#[from] TryFromPrimitiveError<Universe>),
+    /// invalid account type: {0}
+    InvalidAccountType(#[from] TryFromPrimitiveError<AccountType>),
+    /// invalid instance: {0}
+    InvalidInstance(#[from] TryFromPrimitiveError<Instance>),
+    /// invalid account number: {0}
+    InvalidAccountNumber(u32),
 
-/// Error type to represent an invalid universe value.
-#[derive(Debug, Clone, Copy)]
-pub struct InvalidUniverse(u8);
-
-impl fmt::Display for InvalidUniverse {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Invalid universe: {}", self.0)
-    }
+    /// account type does not have a character representation: {0:?}
+    NoCharacterRepresentation(AccountType),
+    /// character representation is not a valid account type: {0}
+    InvalidCharacterRepresentation(char),
+    /// parse error: {0}
+    ParseError(&'static str),
 }
 
 #[cfg(feature = "std")]
-impl std::error::Error for InvalidUniverse {}
+impl std::error::Error for Error {}
 
-impl TryFrom<u8> for Universe {
-    type Error = InvalidUniverse;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        use Universe::{Beta, Developer, Individual, Internal, Public, Rc};
-        Ok(match value {
-            0 => Individual,
-            1 => Public,
-            2 => Beta,
-            3 => Internal,
-            4 => Developer,
-            5 => Rc,
-            _ => Err(InvalidUniverse(value))?,
-        })
-    }
-}
-
-impl From<Universe> for u8 {
-    fn from(value: Universe) -> Self {
-        use Universe::{Beta, Developer, Individual, Internal, Public, Rc};
-        match value {
-            Individual => 0,
-            Public => 1,
-            Beta => 2,
-            Internal => 3,
-            Developer => 4,
-            Rc => 5,
-        }
-    }
-}
-
-/// Error type to represent an invalid account type.
-#[derive(Debug, Clone, Copy)]
-pub enum InvalidAccountType {
-    /// Invalid value for account type.
-    InvalidValue(u8),
-    /// Invalid character for account type.
-    InvalidChar(char),
-}
-
-impl fmt::Display for InvalidAccountType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use InvalidAccountType::{InvalidChar, InvalidValue};
-        match self {
-            InvalidValue(value) => write!(f, "Invalid account type (u8): {}", value),
-            InvalidChar(ch) => write!(f, "Invalid account type (char): {}", ch),
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for InvalidAccountType {}
-
-impl TryFrom<u8> for AccountType {
-    type Error = InvalidAccountType;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        use AccountType::{
-            AnonGameServer, AnonUser, Chat, Clan, ContentServer, GameServer, Individual, Invalid,
-            Multiseat, P2pSuperSeeder, Pending,
-        };
-        Ok(match value {
-            0 => Invalid,
-            1 => Individual,
-            2 => Multiseat,
-            3 => GameServer,
-            4 => AnonGameServer,
-            5 => Pending,
-            6 => ContentServer,
-            7 => Clan,
-            8 => Chat,
-            9 => P2pSuperSeeder,
-            10 => AnonUser,
-            _ => Err(InvalidAccountType::InvalidValue(value))?,
-        })
-    }
-}
-
-impl From<AccountType> for u8 {
-    fn from(value: AccountType) -> Self {
-        use AccountType::{
-            AnonGameServer, AnonUser, Chat, Clan, ContentServer, GameServer, Individual, Invalid,
-            Multiseat, P2pSuperSeeder, Pending,
-        };
-        match value {
-            Invalid => 0,
-            Individual => 1,
-            Multiseat => 2,
-            GameServer => 3,
-            AnonGameServer => 4,
-            Pending => 5,
-            ContentServer => 6,
-            Clan => 7,
-            Chat => 8,
-            P2pSuperSeeder => 9,
-            AnonUser => 10,
-        }
-    }
-}
+/// Result type for crate.
+type Result<T, E = Error> = core::result::Result<T, E>;
 
 impl TryFrom<char> for AccountType {
-    type Error = InvalidAccountType;
+    type Error = Error;
 
     fn try_from(value: char) -> Result<Self, Self::Error> {
         use AccountType::{
@@ -270,18 +204,21 @@ impl TryFrom<char> for AccountType {
             'g' => Clan,
             'T' | 'L' | 'c' => Chat,
             'a' => AnonUser,
-            _ => Err(InvalidAccountType::InvalidChar(value))?,
+            _ => Err(Error::InvalidCharacterRepresentation(value))?,
         })
     }
 }
 
-impl From<AccountType> for char {
-    fn from(value: AccountType) -> Self {
+impl TryFrom<AccountType> for char {
+    type Error = Error;
+
+    fn try_from(value: AccountType) -> Result<Self> {
         use AccountType::{
             AnonGameServer, AnonUser, Chat, Clan, ContentServer, GameServer, Individual, Invalid,
             Multiseat, P2pSuperSeeder, Pending,
         };
-        match value {
+
+        Ok(match value {
             Invalid => 'I',
             Individual => 'U',
             Multiseat => 'M',
@@ -291,389 +228,312 @@ impl From<AccountType> for char {
             ContentServer => 'C',
             Clan => 'g',
             Chat => 'T',
-            P2pSuperSeeder => {
-                unimplemented!("P2pSuperSeeder does not have a character representation")
-            }
+            P2pSuperSeeder => Err(Error::NoCharacterRepresentation(value))?,
             AnonUser => 'a',
-        }
-    }
-}
-
-/// Error type to represent an invalid instance value.
-#[derive(Debug, Clone, Copy)]
-pub struct InvalidInstance(u32);
-
-impl fmt::Display for InvalidInstance {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Invalid instance: {}", self.0)
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for InvalidInstance {}
-
-impl TryFrom<u32> for Instance {
-    type Error = InvalidInstance;
-
-    fn try_from(value: u32) -> Result<Self, Self::Error> {
-        use Instance::{All, Console, Desktop, Web};
-        Ok(match value {
-            0 => All,
-            1 => Desktop,
-            2 => Console,
-            3 => Web,
-            _ => Err(InvalidInstance(value))?,
         })
     }
 }
 
-impl From<Instance> for u32 {
-    fn from(value: Instance) -> Self {
-        use Instance::{All, Console, Desktop, Web};
-        match value {
-            All => 0,
-            Desktop => 1,
-            Console => 2,
-            Web => 3,
-        }
-    }
-}
-
-/// Error type to represent an invalid account number value.
-#[derive(Debug, Clone, Copy)]
-pub struct InvalidAccountNumber(u32);
-
-impl fmt::Display for InvalidAccountNumber {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Invalid account number: {}", self.0)
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for InvalidAccountNumber {}
-
 impl TryFrom<u32> for AccountNumber {
-    type Error = InvalidAccountNumber;
+    type Error = Error;
 
-    fn try_from(value: u32) -> Result<Self, Self::Error> {
+    fn try_from(value: u32) -> Result<Self> {
         if value > 0x7FFF_FFFF {
-            Err(InvalidAccountNumber(value))?;
+            Err(Error::InvalidAccountNumber(value))?;
         }
-        Ok(AccountNumber(value))
+        Ok(Self(value))
     }
 }
 
-impl From<AccountNumber> for u32 {
-    fn from(value: AccountNumber) -> Self {
-        value.0
+impl From<SteamId> for u64 {
+    #[inline]
+    fn from(steam_id: SteamId) -> Self {
+        steam_id.0
     }
 }
 
-impl From<u32> for AccountId {
-    fn from(value: u32) -> Self {
-        AccountId(value)
+impl TryFrom<u64> for SteamId {
+    type Error = Error;
+
+    #[inline]
+    fn try_from(steam_id: u64) -> Result<Self, Self::Error> {
+        let steam_id = Self(steam_id);
+        steam_id.try_universe()?;
+        steam_id.try_account_type()?;
+        steam_id.try_instance()?;
+        steam_id.try_account_number()?;
+        Ok(steam_id)
     }
 }
 
-impl From<AccountId> for u32 {
-    fn from(value: AccountId) -> Self {
-        value.0
-    }
-}
+impl SteamId {
+    const UNIVERSE_MASK: u64 = 0xFF;
+    const UNIVERSE_SHIFT: u64 = 56;
+    const ACCOUNT_TYPE_MASK: u64 = 0xF;
+    const ACCOUNT_TYPE_SHIFT: u64 = 52;
+    const INSTANCE_MASK: u64 = 0xF_FFFF;
+    const INSTANCE_SHIFT: u64 = 32;
+    const ACCOUNT_NUMBER_MASK: u64 = 0xFFFF_FFFF;
+    const ACCOUNT_NUMBER_SHIFT: u64 = 1;
+    const ACCOUNT_ID_MASK: u64 = 0xFFFF_FFFF;
+    const ACCOUNT_ID_SHIFT: u64 = 0;
 
-impl From<SteamID> for u64 {
-    fn from(value: SteamID) -> Self {
-        value.0
-    }
-}
-
-impl fmt::Debug for SteamID {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("SteamID")
-            .field("value", &self.0)
-            .field("universe", &self.universe())
-            .field("type", &self.account_type())
-            .field("instance", &self.instance())
-            .field("account_number", &self.account_number())
-            .field("account_id", &self.account_id())
-            .finish()
-    }
-}
-
-impl fmt::Display for SteamID {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "SteamID({})", &self.0)
-    }
-}
-
-/// Error type to represent an invalid steam id.
-#[derive(Debug)]
-pub enum InvalidSteamID {
-    /// The universe is invalid.
-    InvalidUniverse(InvalidUniverse),
-    /// The account type is invalid.
-    InvalidAccountType(InvalidAccountType),
-    /// The instance is invalid.
-    InvalidInstance(InvalidInstance),
-    /// The account number is invalid.
-    InvalidAccountNumber(InvalidAccountNumber),
-    /// The format of the string is invalid.
-    InvalidFormat,
-    /// There was an issue parsing some number.
-    ParseIntError(core::num::ParseIntError),
-}
-
-impl fmt::Display for InvalidSteamID {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            InvalidSteamID::InvalidUniverse(value) => value.fmt(f),
-            InvalidSteamID::InvalidAccountType(value) => value.fmt(f),
-            InvalidSteamID::InvalidInstance(value) => value.fmt(f),
-            InvalidSteamID::InvalidAccountNumber(value) => value.fmt(f),
-            InvalidSteamID::InvalidFormat => write!(f, "Invalid SteamID format"),
-            InvalidSteamID::ParseIntError(value) => value.fmt(f),
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for InvalidSteamID {}
-
-impl From<InvalidUniverse> for InvalidSteamID {
-    fn from(value: InvalidUniverse) -> Self {
-        InvalidSteamID::InvalidUniverse(value)
-    }
-}
-
-impl From<InvalidAccountType> for InvalidSteamID {
-    fn from(value: InvalidAccountType) -> Self {
-        InvalidSteamID::InvalidAccountType(value)
-    }
-}
-
-impl From<InvalidInstance> for InvalidSteamID {
-    fn from(value: InvalidInstance) -> Self {
-        InvalidSteamID::InvalidInstance(value)
-    }
-}
-
-impl From<InvalidAccountNumber> for InvalidSteamID {
-    fn from(value: InvalidAccountNumber) -> Self {
-        InvalidSteamID::InvalidAccountNumber(value)
-    }
-}
-
-impl From<core::num::ParseIntError> for InvalidSteamID {
-    fn from(value: core::num::ParseIntError) -> Self {
-        InvalidSteamID::ParseIntError(value)
-    }
-}
-
-impl From<Infallible> for InvalidSteamID {
-    fn from(_: Infallible) -> Self {
-        unreachable!()
-    }
-}
-
-impl AccountId {
-    /// Returns the `AccountNumber` of the `AccountId`.
+    /// Constructs a new `SteamId` from a steam64id.
     ///
     /// # Errors
-    /// Returns `InvalidAccountNumber` if the account number is invalid.
-    pub fn account_number(&self) -> Result<AccountNumber, InvalidAccountNumber> {
-        ((self.0 >> 1) as u32).try_into()
+    /// This method will return an error if the steam64id is invalid.
+    pub fn new(steam_id: u64) -> Result<Self> {
+        steam_id.try_into()
     }
-}
 
-impl SteamID {
-    /// Constructs a new `SteamID` from the steam64id.
+    /// Returns the `Universe` of the `SteamId`.
+    ///
+    /// # Errors
+    /// This method returns an error if the universe is invalid.
+    pub fn try_universe(&self) -> Result<Universe> {
+        Ok(Universe::try_from(
+            ((self.0 >> Self::UNIVERSE_SHIFT) & Self::UNIVERSE_MASK) as u8,
+        )?)
+    }
+
+    /// Returns the `Universe` of the `SteamId`.
+    ///
+    /// # Panics
+    /// This method panics if the universe is invalid.
     #[must_use]
-    pub fn new(steam64id: u64) -> Self {
-        // TODO: We should validate the steam64id here, and remove the errors for the other methods.
-        SteamID(steam64id)
+    pub fn universe(&self) -> Universe {
+        self.try_universe().unwrap()
     }
 
-    /// Returns the `Universe` of the `SteamID`.
+    /// Returns the account type of the `SteamId`.
     ///
     /// # Errors
-    /// Returns `InvalidUniverse` if the universe is invalid.
-    pub fn universe(&self) -> Result<Universe, InvalidUniverse> {
-        (((self.0 >> 56) & 0xFF) as u8).try_into()
+    /// This method returns an error if the account type is invalid.
+    pub fn try_account_type(&self) -> Result<AccountType> {
+        Ok(AccountType::try_from(
+            ((self.0 >> Self::ACCOUNT_TYPE_SHIFT) & Self::ACCOUNT_TYPE_MASK) as u8,
+        )?)
     }
 
-    /// Returns the account type of the `SteamID`.
+    /// Returns the account type of the `SteamId`.
     ///
-    /// # Errors
-    /// Returns `InvalidAccountType` if the account type is invalid.
-    pub fn account_type(&self) -> Result<AccountType, InvalidAccountType> {
-        (((self.0 >> 52) & 0xF) as u8).try_into()
+    /// # Panics
+    /// This method panics if the account type is invalid.
+    #[must_use]
+    pub fn account_type(&self) -> AccountType {
+        self.try_account_type().unwrap()
     }
 
-    /// Returns the instance of the `SteamID`.
+    /// Returns the instance of the `SteamId`.
     ///
     /// # Errors
-    /// Returns `InvalidInstance` if the instance is invalid.
-    pub fn instance(&self) -> Result<Instance, InvalidInstance> {
-        (((self.0 >> 32) & 0xFFFFF) as u32).try_into()
+    /// This method returns an error if the instance is invalid.
+    pub fn try_instance(&self) -> Result<Instance> {
+        Ok(Instance::try_from(
+            ((self.0 >> Self::INSTANCE_SHIFT) & Self::INSTANCE_MASK) as u32,
+        )?)
     }
 
-    /// Returns the `AccountNumber` of the `SteamID`.
+    /// Returns the instance of the `SteamId`.
     ///
-    /// # Errors
-    /// Returns `InvalidAccountNumber` if the account number is invalid.
-    pub fn account_number(&self) -> Result<AccountNumber, InvalidAccountNumber> {
-        (((self.0 & 0xFFFF_FFFF) >> 1) as u32).try_into()
+    /// # Panics
+    /// This method panics if the instance is invalid.
+    #[must_use]
+    pub fn instance(&self) -> Instance {
+        self.try_instance().unwrap()
     }
 
-    /// Returns the `AccountId` of the `SteamID`.
+    /// Returns the `AccountNumber` of the `SteamId`.
     ///
     /// # Errors
-    /// This method is currently infallible, but may return an error in the future.
-    pub fn account_id(&self) -> Result<AccountId, Infallible> {
-        ((self.0 & 0xFFFF_FFFF) as u32).try_into()
+    /// This method returns an error if the account number is invalid.
+    pub fn try_account_number(&self) -> Result<AccountNumber> {
+        AccountNumber::try_from(
+            ((self.0 & Self::ACCOUNT_NUMBER_MASK) >> Self::ACCOUNT_NUMBER_SHIFT) as u32,
+        )
     }
 
-    /// Returns the steam2id representation of the `SteamID`.
+    /// Returns the `AccountNumber` of the `SteamId`.
+    ///
+    /// # Panics
+    /// This method panics if the account number is invalid.
+    #[must_use]
+    pub fn account_number(&self) -> AccountNumber {
+        self.try_account_number().unwrap()
+    }
+
+    /// Returns the `AccountId` of the `SteamId`.
+    #[must_use]
+    pub fn account_id(&self) -> AccountId {
+        AccountId(((self.0 & Self::ACCOUNT_ID_MASK) >> Self::ACCOUNT_ID_SHIFT) as u32)
+    }
+
+    /// Returns the steam2id representation of the `SteamId`.
     ///
     /// # Errors
-    /// Returns `InvalidSteamID` if the `SteamID` is invalid.
-    pub fn steam2id(&self) -> Result<String, InvalidSteamID> {
+    /// This method returns an error if the universe or account number are invalid.
+    pub fn try_steam2id(&self) -> Result<String> {
         Ok(format!(
             "STEAM_{}:{}:{}",
-            u8::from(self.universe()?),
+            u8::from(self.try_universe()?),
             self.0 & 0x1,
-            u32::from(self.account_number()?)
+            u32::from(self.try_account_number()?)
         ))
     }
 
-    /// Returns the steam3id representation of the `SteamID`.
+    /// Returns the steam2id representation of the `SteamId`.
+    ///
+    /// # Panics
+    /// This method panics if the universe or account number are invalid.
+    #[must_use]
+    pub fn steam2id(&self) -> String {
+        self.try_steam2id().unwrap()
+    }
+
+    /// Returns the steam3id representation of the `SteamId`.
     ///
     /// # Errors
-    /// Returns `InvalidSteamID` if the `SteamID` is invalid.
-    pub fn steam3id(&self) -> Result<String, InvalidSteamID> {
+    /// This method returns an error if the account type or universe are invalid.
+    pub fn try_steam3id(&self) -> Result<String> {
         Ok(format!(
             "[{}:{}:{}]",
-            char::from(self.account_type()?),
-            u8::from(self.universe()?),
-            u32::from(self.account_id()?)
+            char::try_from(self.try_account_type()?)?,
+            u8::from(self.try_universe()?),
+            u32::from(self.account_id())
         ))
     }
 
-    /// Returns the `SteamID` as a 64-bit integer.
+    /// Returns the steam3id representation of the `SteamId`.
+    ///
+    /// # Panics
+    /// This method panics if the account type or universe are invalid.
     #[must_use]
-    pub fn steam64id(&self) -> u64 {
-        self.0
+    pub fn steam3id(&self) -> String {
+        self.try_steam3id().unwrap()
     }
 
-    /// Parse steam2id into a `SteamID`.
+    /// Parse steam2id into a `SteamId`.
     ///
     /// # Errors
-    /// Returns `InvalidSteamID` if the steam2id is invalid.
+    /// This method returns an error if the steam2id is invalid.
     pub fn parse_steam2id<S: AsRef<str>>(
         value: S,
         account_type: AccountType,
         instance: Instance,
-    ) -> Result<Self, InvalidSteamID> {
-        use InvalidSteamID::InvalidFormat;
-
+    ) -> Result<Self> {
         let value = value.as_ref();
 
         if !value.starts_with("STEAM_") {
-            return Err(InvalidFormat);
+            Err(Error::ParseError("does not start with `STEAM_`"))?;
         }
 
         let mut parts = value[6..].split(':');
 
-        let universe = Universe::try_from(parts.next().ok_or(InvalidFormat)?.parse::<u8>()?)?;
-        let id = u64::from(parts.next().ok_or(InvalidFormat)?.parse::<u8>()?);
-        let account_number =
-            AccountNumber::try_from(parts.next().ok_or(InvalidFormat)?.parse::<u32>()?)?;
+        let universe = parts
+            .next()
+            .ok_or(Error::ParseError("missing universe"))
+            .and_then(|v| {
+                v.parse::<u8>()
+                    .map_err(|_| Error::ParseError("universe is not an integer"))
+            })
+            .and_then(|v| Ok(Universe::try_from(v)?))?;
+        let id = parts
+            .next()
+            .ok_or(Error::ParseError("missing id"))
+            .and_then(|v| {
+                v.parse::<u8>()
+                    .map_err(|_| Error::ParseError("id is not an integer"))
+            })?;
+        let account_number = parts
+            .next()
+            .ok_or(Error::ParseError("missing account number"))
+            .and_then(|v| {
+                v.parse::<u32>()
+                    .map_err(|_| Error::ParseError("account number is not an integer"))
+            })
+            .and_then(AccountNumber::try_from)?;
 
-        Ok(SteamID(
-            (u64::from(u8::from(universe)) << 56)
-                | (u64::from(u8::from(account_type) & 0xF) << 52)
-                | (u64::from(u32::from(instance) & 0x7FFF) << 32)
-                | (u64::from(u32::from(account_number)) << 0x1)
-                | (id & 0x1),
-        ))
+        SteamId::new(
+            u64::from(u8::from(universe)) << Self::UNIVERSE_SHIFT
+                | u64::from(u8::from(account_type) & 0xF) << Self::ACCOUNT_TYPE_SHIFT
+                | u64::from(u32::from(instance) & 0x7FFF) << Self::INSTANCE_SHIFT
+                | u64::from(u32::from(account_number)) << Self::ACCOUNT_NUMBER_SHIFT
+                | u64::from(id & 0x1),
+        )
     }
 
-    /// Parse steam3id into a `SteamID`.
+    /// Parse steam3id into a `SteamId`.
     ///
     /// # Errors
-    /// Returns `InvalidSteamID` if the steam3id is invalid.
-    pub fn parse_steam3id<S: AsRef<str>>(
-        value: S,
-        instance: Instance,
-    ) -> Result<Self, InvalidSteamID> {
-        use InvalidSteamID::InvalidFormat;
+    /// This method returns an error if the steam3id is invalid.
+    pub fn parse_steam3id<S: AsRef<str>>(value: S, instance: Instance) -> Result<Self> {
+        let mut value = value.as_ref();
 
-        let value = value.as_ref();
-
-        if !value.starts_with('[') || !value.ends_with(']') {
-            return Err(InvalidFormat);
+        if value.starts_with('[') && value.ends_with(']') {
+            value = &value[1..value.len() - 1];
         }
 
-        let mut parts = value[1..value.len() - 1].split(':');
+        let mut parts = value.split(':');
 
-        let account_type = parts.next().ok_or(InvalidFormat)?;
-        if account_type.len() != 1 {
-            return Err(InvalidFormat);
-        }
-        let account_type =
-            AccountType::try_from(account_type.chars().next().ok_or(InvalidFormat)?)?;
-        let universe = Universe::try_from(parts.next().ok_or(InvalidFormat)?.parse::<u8>()?)?;
-        let account_id = AccountId::try_from(parts.next().ok_or(InvalidFormat)?.parse::<u32>()?)?;
+        let account_type = parts
+            .next()
+            .filter(|v| v.len() == 1)
+            .ok_or(Error::ParseError("missing account type"))
+            .map(str::chars)?
+            .next()
+            .ok_or(Error::ParseError("account type should be a character"))
+            .and_then(AccountType::try_from)?;
+        let universe = parts
+            .next()
+            .ok_or(Error::ParseError("missing universe"))
+            .and_then(|v| {
+                v.parse::<u8>()
+                    .map_err(|_| Error::ParseError("universe is not an integer"))
+            })
+            .and_then(|v| Ok(Universe::try_from(v)?))?;
+        let account_id = parts
+            .next()
+            .ok_or(Error::ParseError("missing account id"))
+            .and_then(|v| {
+                v.parse::<u32>()
+                    .map_err(|_| Error::ParseError("account id is not an integer"))
+            })
+            .map(AccountId::from)?;
 
-        let id = account_id.0 & 0x1;
-        let account_number = account_id.account_number()?;
-
-        Ok(SteamID(
-            (u64::from(u8::from(universe)) << 56)
-                | (u64::from(u8::from(account_type) & 0xF) << 52)
-                | (u64::from(u32::from(instance) & 0x7FFF) << 32)
-                | (u64::from(u32::from(account_number)) << 0x1)
-                | u64::from(id),
-        ))
+        SteamId::new(
+            u64::from(u8::from(universe)) << Self::UNIVERSE_SHIFT
+                | u64::from(u8::from(account_type) & 0xF) << Self::ACCOUNT_TYPE_SHIFT
+                | u64::from(u32::from(instance) & 0x7FFF) << Self::INSTANCE_SHIFT
+                | u64::from(u32::from(account_id)),
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use alloc::format;
-
-    use super::{AccountType, Instance, SteamID};
+    use crate::{AccountType, Instance, SteamId};
 
     #[test]
     fn steamid_to_others() {
-        let steamid = SteamID(76_561_197_999_189_721);
-        assert_eq!(steamid.steam2id().unwrap(), "STEAM_1:1:19461996");
-        assert_eq!(steamid.steam3id().unwrap(), "[U:1:38923993]");
+        let steamid = SteamId::new(76_561_197_999_189_721).unwrap();
+        assert_eq!(steamid.steam2id(), "STEAM_1:1:19461996");
+        assert_eq!(steamid.steam3id(), "[U:1:38923993]");
     }
 
     #[test]
     fn steamid_from_steam2id() {
-        let steamid = SteamID::parse_steam2id(
+        let steamid = SteamId::parse_steam2id(
             "STEAM_1:1:19461996",
             AccountType::Individual,
             Instance::Desktop,
         )
         .unwrap();
-        assert_eq!(steamid, SteamID(76_561_197_999_189_721));
+        assert_eq!(steamid, SteamId(76_561_197_999_189_721));
     }
 
     #[test]
     fn steamid_from_steam3id() {
-        let steamid = SteamID::parse_steam3id("[U:1:38923993]", Instance::Desktop).unwrap();
-        assert_eq!(steamid, SteamID(76_561_197_999_189_721));
-    }
-
-    #[test]
-    fn steamid_debug() {
-        let steamid = SteamID(76_561_197_999_189_721);
-        assert_eq!(
-            format!("{:?}", steamid),
-            "SteamID { value: 76561197999189721, universe: Ok(Public), type: Ok(Individual), instance: Ok(Desktop), account_number: Ok(AccountNumber(19461996)), account_id: Ok(AccountId(38923993)) }"
-        );
+        let steamid = SteamId::parse_steam3id("[U:1:38923993]", Instance::Desktop).unwrap();
+        assert_eq!(steamid, SteamId(76_561_197_999_189_721));
     }
 }
