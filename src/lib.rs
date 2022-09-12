@@ -305,6 +305,12 @@ impl SteamId {
         self.try_universe().unwrap()
     }
 
+    /// Sets the `Universe` of the `SteamId`.
+    pub fn set_universe(&mut self, universe: Universe) {
+        self.0 = (self.0 & !(Self::UNIVERSE_MASK << Self::UNIVERSE_SHIFT))
+            | ((u64::from(u8::from(universe)) & Self::UNIVERSE_MASK) << Self::UNIVERSE_SHIFT);
+    }
+
     /// Returns the account type of the `SteamId`.
     ///
     /// # Errors
@@ -322,6 +328,13 @@ impl SteamId {
     #[must_use]
     pub fn account_type(&self) -> AccountType {
         self.try_account_type().unwrap()
+    }
+
+    /// Sets the account type of the `SteamId`.
+    pub fn set_account_type(&mut self, account_type: AccountType) {
+        self.0 = (self.0 & !(Self::ACCOUNT_TYPE_MASK << Self::ACCOUNT_TYPE_SHIFT))
+            | ((u64::from(u8::from(account_type)) & Self::ACCOUNT_TYPE_MASK)
+                << Self::ACCOUNT_TYPE_SHIFT);
     }
 
     /// Returns the instance of the `SteamId`.
@@ -343,6 +356,12 @@ impl SteamId {
         self.try_instance().unwrap()
     }
 
+    /// Sets the instance of the `SteamId`.
+    pub fn set_instance(&mut self, instance: Instance) {
+        self.0 = (self.0 & !(Self::INSTANCE_MASK << Self::INSTANCE_SHIFT))
+            | ((u64::from(u32::from(instance)) & Self::INSTANCE_MASK) << Self::INSTANCE_SHIFT);
+    }
+
     /// Returns the `AccountNumber` of the `SteamId`.
     ///
     /// # Errors
@@ -362,10 +381,24 @@ impl SteamId {
         self.try_account_number().unwrap()
     }
 
+    /// Sets the `AccountNumber` of the `SteamId`.
+    pub fn set_account_number(&mut self, account_number: AccountNumber) {
+        self.0 = (self.0 & !(Self::ACCOUNT_NUMBER_MASK << Self::ACCOUNT_NUMBER_SHIFT))
+            | ((u64::from(u32::from(account_number)) & Self::ACCOUNT_NUMBER_MASK)
+                << Self::ACCOUNT_NUMBER_SHIFT);
+    }
+
     /// Returns the `AccountId` of the `SteamId`.
     #[must_use]
     pub fn account_id(&self) -> AccountId {
         AccountId(((self.0 & Self::ACCOUNT_ID_MASK) >> Self::ACCOUNT_ID_SHIFT) as u32)
+    }
+
+    /// Sets the `AccountId` of the `SteamId`.
+    pub fn set_account_id(&mut self, account_id: AccountId) {
+        self.0 = (self.0 & !(Self::ACCOUNT_ID_MASK << Self::ACCOUNT_ID_SHIFT))
+            | ((u64::from(u32::from(account_id)) & Self::ACCOUNT_ID_MASK)
+                << Self::ACCOUNT_ID_SHIFT);
     }
 
     /// Returns the steam2id representation of the `SteamId`.
@@ -511,7 +544,7 @@ impl SteamId {
 
 #[cfg(test)]
 mod tests {
-    use crate::{AccountType, Instance, SteamId};
+    use crate::{AccountType, Instance, SteamId, Universe};
 
     #[test]
     fn steamid_to_others() {
@@ -535,5 +568,14 @@ mod tests {
     fn steamid_from_steam3id() {
         let steamid = SteamId::parse_steam3id("[U:1:38923993]", Instance::Desktop).unwrap();
         assert_eq!(steamid, SteamId(76_561_197_999_189_721));
+    }
+
+    #[test]
+    fn steamid_universe_change() {
+        let mut steamid = SteamId::new(76_561_197_999_189_721).unwrap();
+        assert_eq!(steamid.universe(), Universe::Public);
+        steamid.set_universe(Universe::Individual);
+        assert_eq!(steamid.universe(), Universe::Individual);
+        assert_eq!(steamid.steam2id(), "STEAM_0:1:19461996");
     }
 }
