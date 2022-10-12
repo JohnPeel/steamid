@@ -304,6 +304,15 @@ impl SteamId {
     const PARITY_BIT_MASK: u64 = 0x1;
     const PARITY_BIT_SHIFT: u64 = 0;
 
+    /// Contructs a new `SteamId` from a raw u64.
+    ///
+    /// # NOTE
+    /// This should only be used if the u64 is known to be a valid `SteamId`.
+    /// If it is not used correctly, it will cause a panic in another place.
+    fn new_unchecked(steam_id: u64) -> Self {
+        SteamId(steam_id)
+    }
+
     /// Constructs a new `SteamId` from a steam64id.
     ///
     /// # Errors
@@ -540,13 +549,15 @@ impl SteamId {
             })
             .and_then(AccountNumber::try_from)?;
 
-        SteamId::new(
-            u64::from(u8::from(universe)) << Self::UNIVERSE_SHIFT
-                | u64::from(u8::from(account_type) & 0xF) << Self::ACCOUNT_TYPE_SHIFT
-                | u64::from(u32::from(instance) & 0x7FFF) << Self::INSTANCE_SHIFT
-                | u64::from(u32::from(account_number)) << Self::ACCOUNT_NUMBER_SHIFT
-                | u64::from(u8::from(parity_bit) & 0x1),
-        )
+        // All of the parts are valid, so we can use unchecked.
+        Ok(SteamId::new_unchecked(
+            (u64::from(u8::from(universe)) & Self::UNIVERSE_MASK) << Self::UNIVERSE_SHIFT
+                | (u64::from(u8::from(account_type)) & Self::ACCOUNT_TYPE_MASK) << Self::ACCOUNT_TYPE_SHIFT
+                // TODO: Why is this 0x7FFF mask needed?
+                | (u64::from(u32::from(instance) & 0x7FFF) & Self::INSTANCE_MASK) << Self::INSTANCE_SHIFT
+                | (u64::from(u32::from(account_number)) & Self::ACCOUNT_ID_MASK) << Self::ACCOUNT_NUMBER_SHIFT
+                | (u64::from(u8::from(parity_bit)) & Self::PARITY_BIT_MASK) << Self::PARITY_BIT_SHIFT,
+        ))
     }
 
     /// Parse steam3id into a `SteamId`.
@@ -587,12 +598,14 @@ impl SteamId {
             })
             .map(AccountId::from)?;
 
-        SteamId::new(
-            u64::from(u8::from(universe)) << Self::UNIVERSE_SHIFT
-                | u64::from(u8::from(account_type) & 0xF) << Self::ACCOUNT_TYPE_SHIFT
-                | u64::from(u32::from(instance) & 0x7FFF) << Self::INSTANCE_SHIFT
-                | u64::from(u32::from(account_id)),
-        )
+        // All of the parts are valid, so we can use unchecked.
+        Ok(SteamId::new_unchecked(
+            (u64::from(u8::from(universe)) & Self::UNIVERSE_MASK) << Self::UNIVERSE_SHIFT
+                | (u64::from(u8::from(account_type)) & Self::ACCOUNT_TYPE_MASK) << Self::ACCOUNT_TYPE_SHIFT
+                // TODO: Why is this 0x7FFF mask needed?
+                | (u64::from(u32::from(instance) & 0x7FFF) & Self::INSTANCE_MASK) << Self::INSTANCE_SHIFT
+                | (u64::from(u32::from(account_id)) & Self::ACCOUNT_ID_MASK) << Self::ACCOUNT_ID_SHIFT,
+        ))
     }
 }
 
