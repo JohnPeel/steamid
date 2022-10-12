@@ -52,6 +52,16 @@
 //! # Ok(())
 //! # }
 //! ```
+//! 
+//! ### Convert steam64id to Community Link
+//! ```rust
+//! # use steamid::{SteamId, Error};
+//! # fn main() -> Result<(), Error> {
+//! let steamid = SteamId::new(76561198181797231)?;
+//! let community_link = steamid.community_link();
+//! # Ok(())
+//! # }
+//! ```
 #![cfg_attr(not(feature = "std"), no_std)]
 #![warn(
     missing_docs,
@@ -283,6 +293,8 @@ impl SteamId {
     const ACCOUNT_NUMBER_SHIFT: u64 = 1;
     const ACCOUNT_ID_MASK: u64 = 0xFFFF_FFFF;
     const ACCOUNT_ID_SHIFT: u64 = 0;
+    const PARITY_BIT_MASK: u64 = 0x1;
+    const PARITY_BIT_SHIFT: u64 = 0;
 
     /// Constructs a new `SteamId` from a steam64id.
     ///
@@ -410,12 +422,13 @@ impl SteamId {
     /// Returns the `ParityBit` of the `SteamId`.
     #[must_use]
     pub fn parity_bit(&self) -> ParityBit {
-        ParityBit((self.0 & 1) as u8)
+        ParityBit(((self.0 >> Self::PARITY_BIT_SHIFT) & Self::PARITY_BIT_MASK) as u8)
     }
 
     /// Sets the `ParityBit` of the `SteamId`.
     pub fn set_parity_bit(&mut self, parity_bit: ParityBit) {
-        self.0 = (self.0 & !1) | u64::from(u8::from(parity_bit));
+        self.0 = (self.0 & !(Self::PARITY_BIT_MASK << Self::PARITY_BIT_SHIFT))
+            | (u64::from(u8::from(parity_bit)) << Self::PARITY_BIT_SHIFT);
     }
 
     /// Returns the steam2id representation of the `SteamId`.
@@ -426,7 +439,7 @@ impl SteamId {
         Ok(format!(
             "STEAM_{}:{}:{}",
             u8::from(self.try_universe()?),
-            self.0 & 0x1,
+            u8::from(self.parity_bit()),
             u32::from(self.try_account_number()?)
         ))
     }
@@ -497,12 +510,12 @@ impl SteamId {
                     .map_err(|_| Error::ParseError("universe is not an integer"))
             })
             .and_then(|v| Ok(Universe::try_from(v)?))?;
-        let id = parts
+        let parity_bit = parts
             .next()
-            .ok_or(Error::ParseError("missing id"))
+            .ok_or(Error::ParseError("missing parity_bit"))
             .and_then(|v| {
                 v.parse::<u8>()
-                    .map_err(|_| Error::ParseError("id is not an integer"))
+                    .map_err(|_| Error::ParseError("parity_bit is not an integer"))
             })?;
         let account_number = parts
             .next()
@@ -518,7 +531,7 @@ impl SteamId {
                 | u64::from(u8::from(account_type) & 0xF) << Self::ACCOUNT_TYPE_SHIFT
                 | u64::from(u32::from(instance) & 0x7FFF) << Self::INSTANCE_SHIFT
                 | u64::from(u32::from(account_number)) << Self::ACCOUNT_NUMBER_SHIFT
-                | u64::from(id & 0x1),
+                | u64::from(parity_bit & 0x1),
         )
     }
 
@@ -605,5 +618,19 @@ mod tests {
         steamid.set_universe(Universe::Individual);
         assert_eq!(steamid.universe(), Universe::Individual);
         assert_eq!(steamid.steam2id(), "STEAM_0:1:19461996");
+    }
+
+    #[test]
+    fn steamid_community_link() {
+        let steamid = SteamId::parse_steam2id(
+            "STEAM_0:1:19461996",
+            AccountType::Individual,
+            Instance::Desktop,
+        )
+        .unwrap();
+        assert_eq!(
+            steamid.community_link(),
+            "https://steamcommunity.com/profiles/76561197999189721"
+        );
     }
 }

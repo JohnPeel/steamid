@@ -62,3 +62,15 @@ fn main() -> Result<(), Error> {
     Ok(())
 }
 ```
+
+### Convert steam64id to Community Link
+```rust
+use steamid::{SteamId, Error};
+
+fn main() -> Result<(), Error> {
+    let steamid = SteamId::new(4503603961261785)?;
+    let community_link = steamid.community_link();
+
+    Ok(())
+}
+```
