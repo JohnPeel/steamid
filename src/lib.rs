@@ -159,6 +159,12 @@ pub struct AccountNumber(u32);
 #[derive(Into, derive_more::From)]
 pub struct AccountId(u32);
 
+/// Representation of the parity bit for a `SteamId`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Into, derive_more::From)]
+pub struct ParityBit(u8);
+
 /// Error type for crate.
 #[derive(Debug, Display, From)]
 pub enum Error {
@@ -401,6 +407,17 @@ impl SteamId {
                 << Self::ACCOUNT_ID_SHIFT);
     }
 
+    /// Returns the `ParityBit` of the `SteamId`.
+    #[must_use]
+    pub fn parity_bit(&self) -> ParityBit {
+        ParityBit((self.0 & 1) as u8)
+    }
+
+    /// Sets the `ParityBit` of the `SteamId`.
+    pub fn set_parity_bit(&mut self, parity_bit: ParityBit) {
+        self.0 = (self.0 & !1) | u64::from(u8::from(parity_bit));
+    }
+
     /// Returns the steam2id representation of the `SteamId`.
     ///
     /// # Errors
@@ -443,6 +460,16 @@ impl SteamId {
     #[must_use]
     pub fn steam3id(&self) -> String {
         self.try_steam3id().unwrap()
+    }
+
+    /// Returns the community link for the `SteamId`.
+    #[must_use]
+    pub fn community_link(&self) -> String {
+        let mut steamid = *self;
+        steamid.set_universe(Universe::Public);
+        steamid.set_account_type(AccountType::Individual);
+        steamid.set_instance(Instance::Desktop);
+        format!("https://steamcommunity.com/profiles/{}", u64::from(steamid))
     }
 
     /// Parse steam2id into a `SteamId`.
@@ -573,6 +600,7 @@ mod tests {
     #[test]
     fn steamid_universe_change() {
         let mut steamid = SteamId::new(76_561_197_999_189_721).unwrap();
+        assert_eq!(steamid.steam2id(), "STEAM_1:1:19461996");
         assert_eq!(steamid.universe(), Universe::Public);
         steamid.set_universe(Universe::Individual);
         assert_eq!(steamid.universe(), Universe::Individual);

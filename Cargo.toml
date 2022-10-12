@@ -1,6 +1,6 @@
 [package]
 name = "steamid"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["John Peel <john@dgby.org>"]
 categories = ["no-std"]
 description = "Steam ID type and accessories"
