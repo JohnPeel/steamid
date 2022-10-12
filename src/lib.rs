@@ -262,7 +262,7 @@ impl TryFrom<u32> for AccountNumber {
     type Error = Error;
 
     fn try_from(value: u32) -> Result<Self> {
-        if value > 0x7FFF_FFFF || value % 2 != 0 {
+        if value > 0x7FFF_FFFF {
             Err(Error::InvalidAccountNumber(value))?;
         }
         Ok(Self(value))
@@ -659,5 +659,11 @@ mod tests {
             steamid.community_link(),
             "https://steamcommunity.com/profiles/76561197999189721"
         );
+    }
+
+    #[test]
+    fn steamid_validation() {
+        SteamId::new(76_561_197_999_189_721).unwrap();
+        SteamId::new(76_561_197_960_287_930).unwrap();
     }
 }
