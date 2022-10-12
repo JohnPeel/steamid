@@ -52,7 +52,7 @@
 //! # Ok(())
 //! # }
 //! ```
-//! 
+//!
 //! ### Convert steam64id to Community Link
 //! ```rust
 //! # use steamid::{SteamId, Error};
@@ -172,8 +172,14 @@ pub struct AccountId(u32);
 /// Representation of the parity bit for a `SteamId`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Into, derive_more::From)]
-pub struct ParityBit(u8);
+#[derive(IntoPrimitive, TryFromPrimitive)]
+#[repr(u8)]
+pub enum ParityBit {
+    /// The parity is even.
+    Even = 0,
+    /// The parity is odd.
+    Odd = 1,
+}
 
 /// Error type for crate.
 #[derive(Debug, Display, From)]
@@ -186,6 +192,8 @@ pub enum Error {
     InvalidInstance(#[from] TryFromPrimitiveError<Instance>),
     /// invalid account number: {0}
     InvalidAccountNumber(u32),
+    /// invalid parity bit: {0}
+    InvalidParityBit(#[from] TryFromPrimitiveError<ParityBit>),
 
     /// account type does not have a character representation: {0:?}
     NoCharacterRepresentation(AccountType),
@@ -254,7 +262,7 @@ impl TryFrom<u32> for AccountNumber {
     type Error = Error;
 
     fn try_from(value: u32) -> Result<Self> {
-        if value > 0x7FFF_FFFF {
+        if value > 0x7FFF_FFFF || value % 2 != 0 {
             Err(Error::InvalidAccountNumber(value))?;
         }
         Ok(Self(value))
@@ -420,9 +428,14 @@ impl SteamId {
     }
 
     /// Returns the `ParityBit` of the `SteamId`.
+    ///
+    /// # Panics
+    /// This method will not panic, as the parity bit is always valid.
     #[must_use]
     pub fn parity_bit(&self) -> ParityBit {
-        ParityBit(((self.0 >> Self::PARITY_BIT_SHIFT) & Self::PARITY_BIT_MASK) as u8)
+        // The unwrap is possible because ParityBit covers every case. (0 and 1)
+        ParityBit::try_from(((self.0 >> Self::PARITY_BIT_SHIFT) & Self::PARITY_BIT_MASK) as u8)
+            .unwrap()
     }
 
     /// Sets the `ParityBit` of the `SteamId`.
@@ -516,7 +529,8 @@ impl SteamId {
             .and_then(|v| {
                 v.parse::<u8>()
                     .map_err(|_| Error::ParseError("parity_bit is not an integer"))
-            })?;
+            })
+            .and_then(|v| Ok(ParityBit::try_from(v)?))?;
         let account_number = parts
             .next()
             .ok_or(Error::ParseError("missing account number"))
@@ -531,7 +545,7 @@ impl SteamId {
                 | u64::from(u8::from(account_type) & 0xF) << Self::ACCOUNT_TYPE_SHIFT
                 | u64::from(u32::from(instance) & 0x7FFF) << Self::INSTANCE_SHIFT
                 | u64::from(u32::from(account_number)) << Self::ACCOUNT_NUMBER_SHIFT
-                | u64::from(parity_bit & 0x1),
+                | u64::from(u8::from(parity_bit) & 0x1),
         )
     }
 
