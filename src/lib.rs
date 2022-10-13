@@ -84,6 +84,21 @@ use displaydoc::Display;
 use from_enum::From;
 use num_enum::{IntoPrimitive, TryFromPrimitive, TryFromPrimitiveError};
 
+const UNIVERSE_MASK: u64 = 0xFF;
+const UNIVERSE_SHIFT: u64 = 56;
+const ACCOUNT_TYPE_MASK: u64 = 0xF;
+const ACCOUNT_TYPE_SHIFT: u64 = 52;
+const CHAT_FLAGS_MASK: u64 = 0xFF;
+const CHAT_FLAGS_SHIFT: u64 = 42;
+const INSTANCE_MASK: u64 = 0xFFF;
+const INSTANCE_SHIFT: u64 = 32;
+const ACCOUNT_NUMBER_MASK: u64 = 0xFFFF_FFFF;
+const ACCOUNT_NUMBER_SHIFT: u64 = 1;
+const ACCOUNT_ID_MASK: u64 = 0xFFFF_FFFF;
+const ACCOUNT_ID_SHIFT: u64 = 0;
+const AUTH_SERVER_MASK: u64 = 0x1;
+const AUTH_SERVER_SHIFT: u64 = 0;
+
 /// Representation of a Steam id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -96,17 +111,17 @@ pub struct SteamId(u64);
 #[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub enum Universe {
-    /// Individual or Unspecified
-    Individual = 0,
-    /// Public
+    /// Invalid.
+    Invalid = 0,
+    /// The standard public universe.
     Public = 1,
-    /// Beta
+    /// Beta universe used inside Valve.
     Beta = 2,
-    /// Internal
+    /// Internal universe used inside Valve.
     Internal = 3,
-    /// Developer
+    /// Dev universe used inside Valve.
     Developer = 4,
-    /// RC
+    /// RC (this doesn't exist in the steam_api documentation)
     Rc = 5,
 }
 
@@ -116,31 +131,44 @@ pub enum Universe {
 #[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub enum AccountType {
-    /// Invalid
+    /// Used for invalid Steam IDs.
     Invalid = 0,
-    /// Individual
+    /// Regular user account.
     Individual = 1,
-    /// Multiseat
+    /// Multiseat (e.g. cybercafe) account.
     Multiseat = 2,
-    /// Game Server
+    /// Persistent (not anonymous) game server account.
     GameServer = 3,
-    /// Anon Game Server
+    /// Anonymous game server account.
     AnonGameServer = 4,
-    /// Pending
+    /// Pending.
     Pending = 5,
-    /// Content Server
+    /// Valve internal content server account.
     ContentServer = 6,
-    /// Clan
+    /// Steam Group (clan).
     Clan = 7,
-    /// Chat
+    /// Steam group chat or lobby.
     Chat = 8,
-    /// P2P SuperSeeder
-    P2pSuperSeeder = 9,
-    /// Anon User
+    /// Fake Steam ID for local PSN account on PS3 or Live account on 360, etc.
+    ConsoleUser = 9,
+    /// Anonymous user account. (Used to create an account or reset a password)
     AnonUser = 10,
 }
 
-// TODO: Support Chat flags.
+/// Representation of chat flags for a `SteamId`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(IntoPrimitive, TryFromPrimitive)]
+#[repr(u32)]
+pub enum ChatFlags {
+    /// Clan based chat
+    Clan = 1 << 7,
+    /// Lobby based chat
+    Lobby = 1 << 6,
+    /// Matchmaking lobby based chat
+    MatchmakingLobby = 1 << 5,
+}
+
 /// Representation of an instance for a `SteamId`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -154,7 +182,7 @@ pub enum Instance {
     /// Console
     Console = 2,
     /// Web
-    Web = 3,
+    Web = 4,
 }
 
 /// Representation of an account number for a `SteamId`.
@@ -169,16 +197,16 @@ pub struct AccountNumber(u32);
 #[derive(Into, derive_more::From)]
 pub struct AccountId(u32);
 
-/// Representation of the parity bit for a `SteamId`.
+/// Which auth server is used for a `SteamId`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
-pub enum ParityBit {
-    /// The parity is even.
-    Even = 0,
-    /// The parity is odd.
-    Odd = 1,
+pub enum AuthServer {
+    /// 0
+    Zero = 0,
+    /// 1
+    One = 1,
 }
 
 /// Error type for crate.
@@ -188,12 +216,14 @@ pub enum Error {
     InvalidUniverse(#[from] TryFromPrimitiveError<Universe>),
     /// invalid account type: {0}
     InvalidAccountType(#[from] TryFromPrimitiveError<AccountType>),
+    /// invalid chat flags: {0}
+    InvalidChatFlags(#[from] TryFromPrimitiveError<ChatFlags>),
     /// invalid instance: {0}
     InvalidInstance(#[from] TryFromPrimitiveError<Instance>),
     /// invalid account number: {0}
     InvalidAccountNumber(u32),
-    /// invalid parity bit: {0}
-    InvalidParityBit(#[from] TryFromPrimitiveError<ParityBit>),
+    /// invalid auth server: {0}
+    InvalidAuthServer(#[from] TryFromPrimitiveError<AuthServer>),
 
     /// account type does not have a character representation: {0:?}
     NoCharacterRepresentation(AccountType),
@@ -238,8 +268,8 @@ impl TryFrom<AccountType> for char {
 
     fn try_from(value: AccountType) -> Result<Self> {
         use AccountType::{
-            AnonGameServer, AnonUser, Chat, Clan, ContentServer, GameServer, Individual, Invalid,
-            Multiseat, P2pSuperSeeder, Pending,
+            AnonGameServer, AnonUser, Chat, Clan, ConsoleUser, ContentServer, GameServer,
+            Individual, Invalid, Multiseat, Pending,
         };
 
         Ok(match value {
@@ -252,7 +282,7 @@ impl TryFrom<AccountType> for char {
             ContentServer => 'C',
             Clan => 'g',
             Chat => 'T',
-            P2pSuperSeeder => Err(Error::NoCharacterRepresentation(value))?,
+            ConsoleUser => Err(Error::NoCharacterRepresentation(value))?,
             AnonUser => 'a',
         })
     }
@@ -291,19 +321,6 @@ impl TryFrom<u64> for SteamId {
 }
 
 impl SteamId {
-    const UNIVERSE_MASK: u64 = 0xFF;
-    const UNIVERSE_SHIFT: u64 = 56;
-    const ACCOUNT_TYPE_MASK: u64 = 0xF;
-    const ACCOUNT_TYPE_SHIFT: u64 = 52;
-    const INSTANCE_MASK: u64 = 0xF_FFFF;
-    const INSTANCE_SHIFT: u64 = 32;
-    const ACCOUNT_NUMBER_MASK: u64 = 0xFFFF_FFFF;
-    const ACCOUNT_NUMBER_SHIFT: u64 = 1;
-    const ACCOUNT_ID_MASK: u64 = 0xFFFF_FFFF;
-    const ACCOUNT_ID_SHIFT: u64 = 0;
-    const PARITY_BIT_MASK: u64 = 0x1;
-    const PARITY_BIT_SHIFT: u64 = 0;
-
     /// Contructs a new `SteamId` from a raw u64.
     ///
     /// # NOTE
@@ -327,7 +344,7 @@ impl SteamId {
     /// This method returns an error if the universe is invalid.
     pub fn try_universe(&self) -> Result<Universe> {
         Ok(Universe::try_from(
-            ((self.0 >> Self::UNIVERSE_SHIFT) & Self::UNIVERSE_MASK) as u8,
+            ((self.0 >> UNIVERSE_SHIFT) & UNIVERSE_MASK) as u8,
         )?)
     }
 
@@ -342,8 +359,8 @@ impl SteamId {
 
     /// Sets the `Universe` of the `SteamId`.
     pub fn set_universe(&mut self, universe: Universe) {
-        self.0 = (self.0 & !(Self::UNIVERSE_MASK << Self::UNIVERSE_SHIFT))
-            | ((u64::from(u8::from(universe)) & Self::UNIVERSE_MASK) << Self::UNIVERSE_SHIFT);
+        self.0 = (self.0 & !(UNIVERSE_MASK << UNIVERSE_SHIFT))
+            | ((u64::from(u8::from(universe)) & UNIVERSE_MASK) << UNIVERSE_SHIFT);
     }
 
     /// Returns the account type of the `SteamId`.
@@ -352,7 +369,7 @@ impl SteamId {
     /// This method returns an error if the account type is invalid.
     pub fn try_account_type(&self) -> Result<AccountType> {
         Ok(AccountType::try_from(
-            ((self.0 >> Self::ACCOUNT_TYPE_SHIFT) & Self::ACCOUNT_TYPE_MASK) as u8,
+            ((self.0 >> ACCOUNT_TYPE_SHIFT) & ACCOUNT_TYPE_MASK) as u8,
         )?)
     }
 
@@ -367,9 +384,46 @@ impl SteamId {
 
     /// Sets the account type of the `SteamId`.
     pub fn set_account_type(&mut self, account_type: AccountType) {
-        self.0 = (self.0 & !(Self::ACCOUNT_TYPE_MASK << Self::ACCOUNT_TYPE_SHIFT))
-            | ((u64::from(u8::from(account_type)) & Self::ACCOUNT_TYPE_MASK)
-                << Self::ACCOUNT_TYPE_SHIFT);
+        if account_type != AccountType::Chat {
+            self.reset_chat_flags();
+        }
+
+        self.0 = (self.0 & !(ACCOUNT_TYPE_MASK << ACCOUNT_TYPE_SHIFT))
+            | ((u64::from(u8::from(account_type)) & ACCOUNT_TYPE_MASK) << ACCOUNT_TYPE_SHIFT);
+    }
+
+    /// Returns the chat flags of the `SteamId`.
+    ///
+    /// # Errors
+    /// This method returns an error if the chat flags are invalid.
+    pub fn try_chat_flags(&self) -> Result<Option<ChatFlags>> {
+        let chat_flags = ((self.0 >> CHAT_FLAGS_SHIFT) & CHAT_FLAGS_MASK) as u32;
+        if chat_flags == 0 {
+            return Ok(None);
+        }
+
+        Ok(Some(ChatFlags::try_from(chat_flags)?))
+    }
+
+    /// Returns the chat flags of the `SteamId`.
+    ///
+    /// # Panics
+    /// This method panics if the chat flags are invalid.
+    #[must_use]
+    pub fn chat_flags(&self) -> Option<ChatFlags> {
+        self.try_chat_flags().unwrap()
+    }
+
+    /// Reset the chat flags of the `SteamId`.
+    pub fn reset_chat_flags(&mut self) {
+        self.0 &= !(CHAT_FLAGS_MASK << CHAT_FLAGS_SHIFT);
+    }
+
+    /// Sets the chat flags of the `SteamId`.
+    pub fn set_chat_flags(&mut self, chat_flags: ChatFlags) {
+        self.reset_chat_flags();
+        self.set_account_type(AccountType::Chat);
+        self.0 |= (u64::from(u32::from(chat_flags)) & CHAT_FLAGS_MASK) << CHAT_FLAGS_SHIFT;
     }
 
     /// Returns the instance of the `SteamId`.
@@ -378,7 +432,7 @@ impl SteamId {
     /// This method returns an error if the instance is invalid.
     pub fn try_instance(&self) -> Result<Instance> {
         Ok(Instance::try_from(
-            ((self.0 >> Self::INSTANCE_SHIFT) & Self::INSTANCE_MASK) as u32,
+            ((self.0 >> INSTANCE_SHIFT) & INSTANCE_MASK) as u32,
         )?)
     }
 
@@ -393,8 +447,8 @@ impl SteamId {
 
     /// Sets the instance of the `SteamId`.
     pub fn set_instance(&mut self, instance: Instance) {
-        self.0 = (self.0 & !(Self::INSTANCE_MASK << Self::INSTANCE_SHIFT))
-            | ((u64::from(u32::from(instance)) & Self::INSTANCE_MASK) << Self::INSTANCE_SHIFT);
+        self.0 = (self.0 & !(INSTANCE_MASK << INSTANCE_SHIFT))
+            | ((u64::from(u32::from(instance)) & INSTANCE_MASK) << INSTANCE_SHIFT);
     }
 
     /// Returns the `AccountNumber` of the `SteamId`.
@@ -402,9 +456,7 @@ impl SteamId {
     /// # Errors
     /// This method returns an error if the account number is invalid.
     pub fn try_account_number(&self) -> Result<AccountNumber> {
-        AccountNumber::try_from(
-            ((self.0 & Self::ACCOUNT_NUMBER_MASK) >> Self::ACCOUNT_NUMBER_SHIFT) as u32,
-        )
+        AccountNumber::try_from(((self.0 & ACCOUNT_NUMBER_MASK) >> ACCOUNT_NUMBER_SHIFT) as u32)
     }
 
     /// Returns the `AccountNumber` of the `SteamId`.
@@ -418,39 +470,37 @@ impl SteamId {
 
     /// Sets the `AccountNumber` of the `SteamId`.
     pub fn set_account_number(&mut self, account_number: AccountNumber) {
-        self.0 = (self.0 & !(Self::ACCOUNT_NUMBER_MASK << Self::ACCOUNT_NUMBER_SHIFT))
-            | ((u64::from(u32::from(account_number)) & Self::ACCOUNT_NUMBER_MASK)
-                << Self::ACCOUNT_NUMBER_SHIFT);
+        self.0 = (self.0 & !(ACCOUNT_NUMBER_MASK << ACCOUNT_NUMBER_SHIFT))
+            | ((u64::from(u32::from(account_number)) & ACCOUNT_NUMBER_MASK)
+                << ACCOUNT_NUMBER_SHIFT);
     }
 
     /// Returns the `AccountId` of the `SteamId`.
     #[must_use]
     pub fn account_id(&self) -> AccountId {
-        AccountId(((self.0 & Self::ACCOUNT_ID_MASK) >> Self::ACCOUNT_ID_SHIFT) as u32)
+        AccountId(((self.0 & ACCOUNT_ID_MASK) >> ACCOUNT_ID_SHIFT) as u32)
     }
 
     /// Sets the `AccountId` of the `SteamId`.
     pub fn set_account_id(&mut self, account_id: AccountId) {
-        self.0 = (self.0 & !(Self::ACCOUNT_ID_MASK << Self::ACCOUNT_ID_SHIFT))
-            | ((u64::from(u32::from(account_id)) & Self::ACCOUNT_ID_MASK)
-                << Self::ACCOUNT_ID_SHIFT);
+        self.0 = (self.0 & !(ACCOUNT_ID_MASK << ACCOUNT_ID_SHIFT))
+            | ((u64::from(u32::from(account_id)) & ACCOUNT_ID_MASK) << ACCOUNT_ID_SHIFT);
     }
 
-    /// Returns the `ParityBit` of the `SteamId`.
+    /// Returns the `AuthServer` of the `SteamId`.
     ///
     /// # Panics
     /// This method will not panic, as the parity bit is always valid.
     #[must_use]
-    pub fn parity_bit(&self) -> ParityBit {
+    pub fn auth_server(&self) -> AuthServer {
         // The unwrap is possible because ParityBit covers every case. (0 and 1)
-        ParityBit::try_from(((self.0 >> Self::PARITY_BIT_SHIFT) & Self::PARITY_BIT_MASK) as u8)
-            .unwrap()
+        AuthServer::try_from(((self.0 >> AUTH_SERVER_SHIFT) & AUTH_SERVER_MASK) as u8).unwrap()
     }
 
-    /// Sets the `ParityBit` of the `SteamId`.
-    pub fn set_parity_bit(&mut self, parity_bit: ParityBit) {
-        self.0 = (self.0 & !(Self::PARITY_BIT_MASK << Self::PARITY_BIT_SHIFT))
-            | (u64::from(u8::from(parity_bit)) << Self::PARITY_BIT_SHIFT);
+    /// Sets the `AuthServer` of the `SteamId`.
+    pub fn set_auth_server(&mut self, auth_server: AuthServer) {
+        self.0 = (self.0 & !(AUTH_SERVER_MASK << AUTH_SERVER_SHIFT))
+            | (u64::from(u8::from(auth_server)) << AUTH_SERVER_SHIFT);
     }
 
     /// Returns the steam2id representation of the `SteamId`.
@@ -461,7 +511,7 @@ impl SteamId {
         Ok(format!(
             "STEAM_{}:{}:{}",
             u8::from(self.try_universe()?),
-            u8::from(self.parity_bit()),
+            u8::from(self.auth_server()),
             u32::from(self.try_account_number()?)
         ))
     }
@@ -480,9 +530,21 @@ impl SteamId {
     /// # Errors
     /// This method returns an error if the account type or universe are invalid.
     pub fn try_steam3id(&self) -> Result<String> {
+        let account_type = match self.try_account_type()? {
+            AccountType::Chat => match self.try_chat_flags()? {
+                Some(ChatFlags::Clan) => 'c',
+                Some(ChatFlags::Lobby) => 'L',
+                Some(ChatFlags::MatchmakingLobby) => {
+                    return Err(Error::NoCharacterRepresentation(AccountType::Chat))
+                }
+                None => char::try_from(AccountType::Chat)?,
+            },
+            value => char::try_from(value)?,
+        };
+
         Ok(format!(
             "[{}:{}:{}]",
-            char::try_from(self.try_account_type()?)?,
+            account_type,
             u8::from(self.try_universe()?),
             u32::from(self.account_id())
         ))
@@ -532,14 +594,14 @@ impl SteamId {
                     .map_err(|_| Error::ParseError("universe is not an integer"))
             })
             .and_then(|v| Ok(Universe::try_from(v)?))?;
-        let parity_bit = parts
+        let auth_server = parts
             .next()
-            .ok_or(Error::ParseError("missing parity_bit"))
+            .ok_or(Error::ParseError("missing auth server"))
             .and_then(|v| {
                 v.parse::<u8>()
-                    .map_err(|_| Error::ParseError("parity_bit is not an integer"))
+                    .map_err(|_| Error::ParseError("auth server is not an integer"))
             })
-            .and_then(|v| Ok(ParityBit::try_from(v)?))?;
+            .and_then(|v| Ok(AuthServer::try_from(v)?))?;
         let account_number = parts
             .next()
             .ok_or(Error::ParseError("missing account number"))
@@ -551,12 +613,11 @@ impl SteamId {
 
         // All of the parts are valid, so we can use unchecked.
         Ok(SteamId::new_unchecked(
-            (u64::from(u8::from(universe)) & Self::UNIVERSE_MASK) << Self::UNIVERSE_SHIFT
-                | (u64::from(u8::from(account_type)) & Self::ACCOUNT_TYPE_MASK) << Self::ACCOUNT_TYPE_SHIFT
-                // TODO: Why is this 0x7FFF mask needed?
-                | (u64::from(u32::from(instance) & 0x7FFF) & Self::INSTANCE_MASK) << Self::INSTANCE_SHIFT
-                | (u64::from(u32::from(account_number)) & Self::ACCOUNT_ID_MASK) << Self::ACCOUNT_NUMBER_SHIFT
-                | (u64::from(u8::from(parity_bit)) & Self::PARITY_BIT_MASK) << Self::PARITY_BIT_SHIFT,
+            (u64::from(u8::from(universe)) & UNIVERSE_MASK) << UNIVERSE_SHIFT
+                | (u64::from(u8::from(account_type)) & ACCOUNT_TYPE_MASK) << ACCOUNT_TYPE_SHIFT
+                | (u64::from(u32::from(instance)) & INSTANCE_MASK) << INSTANCE_SHIFT
+                | (u64::from(u32::from(account_number)) & ACCOUNT_ID_MASK) << ACCOUNT_NUMBER_SHIFT
+                | (u64::from(u8::from(auth_server)) & AUTH_SERVER_MASK) << AUTH_SERVER_SHIFT,
         ))
     }
 
@@ -579,8 +640,13 @@ impl SteamId {
             .ok_or(Error::ParseError("missing account type"))
             .map(str::chars)?
             .next()
-            .ok_or(Error::ParseError("account type should be a character"))
-            .and_then(AccountType::try_from)?;
+            .ok_or(Error::ParseError("account type should be a character"))?;
+        let chat_flags = match account_type {
+            'c' => Some(ChatFlags::Clan),
+            'L' => Some(ChatFlags::Lobby),
+            _ => None,
+        };
+        let account_type = AccountType::try_from(account_type)?;
         let universe = parts
             .next()
             .ok_or(Error::ParseError("missing universe"))
@@ -600,18 +666,19 @@ impl SteamId {
 
         // All of the parts are valid, so we can use unchecked.
         Ok(SteamId::new_unchecked(
-            (u64::from(u8::from(universe)) & Self::UNIVERSE_MASK) << Self::UNIVERSE_SHIFT
-                | (u64::from(u8::from(account_type)) & Self::ACCOUNT_TYPE_MASK) << Self::ACCOUNT_TYPE_SHIFT
-                // TODO: Why is this 0x7FFF mask needed?
-                | (u64::from(u32::from(instance) & 0x7FFF) & Self::INSTANCE_MASK) << Self::INSTANCE_SHIFT
-                | (u64::from(u32::from(account_id)) & Self::ACCOUNT_ID_MASK) << Self::ACCOUNT_ID_SHIFT,
+            (u64::from(u8::from(universe)) & UNIVERSE_MASK) << UNIVERSE_SHIFT
+                | (u64::from(u8::from(account_type)) & ACCOUNT_TYPE_MASK) << ACCOUNT_TYPE_SHIFT
+                | (u64::from(chat_flags.map_or(0, u32::from)) & CHAT_FLAGS_MASK)
+                    << CHAT_FLAGS_SHIFT
+                | (u64::from(u32::from(instance)) & INSTANCE_MASK) << INSTANCE_SHIFT
+                | (u64::from(u32::from(account_id)) & ACCOUNT_ID_MASK) << ACCOUNT_ID_SHIFT,
         ))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{AccountType, Instance, SteamId, Universe};
+    use crate::{AccountType, ChatFlags, Instance, SteamId, Universe};
 
     #[test]
     fn steamid_to_others() {
@@ -642,8 +709,8 @@ mod tests {
         let mut steamid = SteamId::new(76_561_197_999_189_721).unwrap();
         assert_eq!(steamid.steam2id(), "STEAM_1:1:19461996");
         assert_eq!(steamid.universe(), Universe::Public);
-        steamid.set_universe(Universe::Individual);
-        assert_eq!(steamid.universe(), Universe::Individual);
+        steamid.set_universe(Universe::Invalid);
+        assert_eq!(steamid.universe(), Universe::Invalid);
         assert_eq!(steamid.steam2id(), "STEAM_0:1:19461996");
     }
 
@@ -663,7 +730,16 @@ mod tests {
 
     #[test]
     fn steamid_validation() {
+        SteamId::new(76_561_197_982_148_920).unwrap();
         SteamId::new(76_561_197_999_189_721).unwrap();
         SteamId::new(76_561_197_960_287_930).unwrap();
+    }
+
+    #[test]
+    fn steamid_chat_flags() {
+        let steamid = SteamId::parse_steam3id("[L:1:38923993]", Instance::All).unwrap();
+
+        assert_eq!(steamid.account_type(), AccountType::Chat);
+        assert_eq!(steamid.chat_flags(), Some(ChatFlags::Lobby));
     }
 }
