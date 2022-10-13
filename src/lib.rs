@@ -530,7 +530,16 @@ impl SteamId {
     /// # Errors
     /// This method returns an error if the account type or universe are invalid.
     pub fn try_steam3id(&self) -> Result<String> {
-        let account_type = match self.try_account_type()? {
+        let account_type = self.try_account_type()?;
+        let instance = matches!(
+            account_type,
+            AccountType::AnonGameServer | AccountType::Multiseat
+        )
+        .then(|| self.try_instance())
+        .transpose()?
+        .map(|instance| format!(":{}", u32::from(instance)));
+
+        let account_type = match account_type {
             AccountType::Chat => match self.try_chat_flags()? {
                 Some(ChatFlags::Clan) => 'c',
                 Some(ChatFlags::Lobby) => 'L',
@@ -543,10 +552,11 @@ impl SteamId {
         };
 
         Ok(format!(
-            "[{}:{}:{}]",
+            "[{}:{}:{}{}]",
             account_type,
             u8::from(self.try_universe()?),
-            u32::from(self.account_id())
+            u32::from(self.account_id()),
+            instance.as_deref().unwrap_or_default()
         ))
     }
 
@@ -575,10 +585,12 @@ impl SteamId {
     /// This method returns an error if the steam2id is invalid.
     pub fn parse_steam2id<S: AsRef<str>>(
         value: S,
-        account_type: AccountType,
-        instance: Instance,
+        account_type: impl Into<Option<AccountType>>,
+        instance: impl Into<Option<Instance>>,
     ) -> Result<Self> {
         let value = value.as_ref();
+        let account_type = account_type.into().unwrap_or(AccountType::Individual);
+        let instance = instance.into().unwrap_or(Instance::Desktop);
 
         if !value.starts_with("STEAM_") {
             Err(Error::ParseError("does not start with `STEAM_`"))?;
@@ -625,8 +637,12 @@ impl SteamId {
     ///
     /// # Errors
     /// This method returns an error if the steam3id is invalid.
-    pub fn parse_steam3id<S: AsRef<str>>(value: S, instance: Instance) -> Result<Self> {
+    pub fn parse_steam3id<S: AsRef<str>>(
+        value: S,
+        default_instance: impl Into<Option<Instance>>,
+    ) -> Result<Self> {
         let mut value = value.as_ref();
+        let default_instance = default_instance.into().unwrap_or(Instance::All);
 
         if value.starts_with('[') && value.ends_with(']') {
             value = &value[1..value.len() - 1];
@@ -664,6 +680,20 @@ impl SteamId {
             })
             .map(AccountId::from)?;
 
+        let instance = match account_type {
+            AccountType::Chat | AccountType::Clan => Instance::All,
+            AccountType::Individual => Instance::Desktop,
+            AccountType::AnonGameServer | AccountType::Multiseat => parts
+                .next()
+                .ok_or(Error::ParseError("missing instance"))
+                .and_then(|v| {
+                    v.parse::<u32>()
+                        .map_err(|_| Error::ParseError("instance is not an integer"))
+                })
+                .map(Instance::try_from)??,
+            _ => default_instance,
+        };
+
         // All of the parts are valid, so we can use unchecked.
         Ok(SteamId::new_unchecked(
             (u64::from(u8::from(universe)) & UNIVERSE_MASK) << UNIVERSE_SHIFT
@@ -689,18 +719,13 @@ mod tests {
 
     #[test]
     fn steamid_from_steam2id() {
-        let steamid = SteamId::parse_steam2id(
-            "STEAM_1:1:19461996",
-            AccountType::Individual,
-            Instance::Desktop,
-        )
-        .unwrap();
+        let steamid = SteamId::parse_steam2id("STEAM_1:1:19461996", None, None).unwrap();
         assert_eq!(steamid, SteamId(76_561_197_999_189_721));
     }
 
     #[test]
     fn steamid_from_steam3id() {
-        let steamid = SteamId::parse_steam3id("[U:1:38923993]", Instance::Desktop).unwrap();
+        let steamid = SteamId::parse_steam3id("[U:1:38923993]", None).unwrap();
         assert_eq!(steamid, SteamId(76_561_197_999_189_721));
     }
 
@@ -716,12 +741,7 @@ mod tests {
 
     #[test]
     fn steamid_community_link() {
-        let steamid = SteamId::parse_steam2id(
-            "STEAM_0:1:19461996",
-            AccountType::Individual,
-            Instance::Desktop,
-        )
-        .unwrap();
+        let steamid = SteamId::parse_steam2id("STEAM_0:1:19461996", None, None).unwrap();
         assert_eq!(
             steamid.community_link(),
             "https://steamcommunity.com/profiles/76561197999189721"
@@ -737,9 +757,20 @@ mod tests {
 
     #[test]
     fn steamid_chat_flags() {
-        let steamid = SteamId::parse_steam3id("[L:1:38923993]", Instance::All).unwrap();
+        let steamid = SteamId::parse_steam3id("[L:1:38923993]", None).unwrap();
 
         assert_eq!(steamid.account_type(), AccountType::Chat);
         assert_eq!(steamid.chat_flags(), Some(ChatFlags::Lobby));
+    }
+
+    #[test]
+    fn steamid_multiseat_steam3id() {
+        let steamid = SteamId::parse_steam3id("[M:1:38923993:4]", None).unwrap();
+
+        assert_eq!(steamid.account_type(), AccountType::Multiseat);
+        // Since this is multiseat and has instance in the steam3id, the instance passed to parse_steam3id is ignored.
+        assert_eq!(steamid.instance(), Instance::Web);
+
+        assert_eq!(steamid.steam3id(), "[M:1:38923993:4]");
     }
 }

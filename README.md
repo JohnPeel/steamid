@@ -22,6 +22,9 @@ fn main() -> Result<(), Error> {
 use steamid::{SteamId, AccountType, Instance, Error};
 
 fn main() -> Result<(), Error> {
+    let steamid = SteamId::parse_steam2id("STEAM_0:0:12345", None, None)?;
+
+    // We can also specify the account type and instance (these are the defaults)
     let steamid = SteamId::parse_steam2id("STEAM_0:0:12345", AccountType::Individual, Instance::Desktop)?;
     
     Ok(())
@@ -33,7 +36,7 @@ fn main() -> Result<(), Error> {
 use steamid::{SteamId, Instance, Error};
 
 fn main() -> Result<(), Error> {
-    let steamid = SteamId::parse_steam3id("[U:1:12345]", Instance::Desktop)?;
+    let steamid = SteamId::parse_steam3id("[U:1:12345]", None)?;
     
     Ok(())
 }
