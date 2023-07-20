@@ -1,0 +1,19 @@
+[package]
+name = "c-api"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "steamid"
+crate-type = ["cdylib"]
+
+[features]
+
+[dependencies]
+steamid = { path = "..", features = ["std"] }
+
+[dev-dependencies]
+inline-c = "0.1"
+
+[build-dependencies]
+cbindgen = "0.24"

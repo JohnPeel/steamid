@@ -189,12 +189,14 @@ pub enum Instance {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Into)]
+#[repr(transparent)]
 pub struct AccountNumber(u32);
 
 /// Representation of an account id for a `SteamId`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Into, derive_more::From)]
+#[repr(transparent)]
 pub struct AccountId(u32);
 
 /// Which auth server is used for a `SteamId`.
@@ -569,14 +571,26 @@ impl SteamId {
         self.try_steam3id().unwrap()
     }
 
-    /// Returns the community link for the `SteamId`.
+    /// Returns a generalized version of this `SteamId`.
+    ///
+    /// This method keeps the account number that same, but sets other parameters to their defaults.
     #[must_use]
-    pub fn community_link(&self) -> String {
+    pub fn generalize(&self) -> Self {
         let mut steamid = *self;
+        steamid.reset_chat_flags();
         steamid.set_universe(Universe::Public);
         steamid.set_account_type(AccountType::Individual);
         steamid.set_instance(Instance::Desktop);
-        format!("https://steamcommunity.com/profiles/{}", u64::from(steamid))
+        steamid
+    }
+
+    /// Returns the community link for the `SteamId`.
+    #[must_use]
+    pub fn community_link(&self) -> String {
+        format!(
+            "https://steamcommunity.com/profiles/{}",
+            u64::from(self.generalize())
+        )
     }
 
     /// Parse steam2id into a `SteamId`.

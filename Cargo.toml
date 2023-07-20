@@ -24,3 +24,6 @@ from-enum = "0.1"
 num_enum = { version = "0.5", default-features = false }
 
 serde = { version = "1.0", default-features = false, features = ["derive"], optional = true }
+
+[workspace]
+members = ["c-api"]
