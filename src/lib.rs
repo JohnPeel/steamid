@@ -70,6 +70,8 @@
     clippy::pedantic
 )]
 #![deny(unsafe_code)]
+// TODO: Remove when this when the lint supports inner attribute or num_enum is updated to use a normal attribute.
+#![allow(non_upper_case_globals)]
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
@@ -140,6 +142,8 @@ pub enum AccountType {
     /// Persistent (not anonymous) game server account.
     GameServer = 3,
     /// Anonymous game server account.
+    ///
+    /// The format of this type is still unknown, and they will not work with this library.
     AnonGameServer = 4,
     /// Pending.
     Pending = 5,
@@ -326,9 +330,12 @@ impl SteamId {
     /// Contructs a new `SteamId` from a raw u64.
     ///
     /// # NOTE
-    /// This should only be used if the u64 is known to be a valid `SteamId`.
-    /// If it is not used correctly, it will cause a panic in another place.
-    fn new_unchecked(steam_id: u64) -> Self {
+    /// If you use this, you should be using the `try_` version of each method on [`SteamId`].
+    ///
+    /// If you use another library that accepts a [`SteamId`], be forwarned that using the
+    /// non-`try_` versions will panic with invalid [`SteamId`] constructed with this method.
+    #[must_use]
+    pub const fn new_unchecked(steam_id: u64) -> Self {
         SteamId(steam_id)
     }
 
