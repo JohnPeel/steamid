@@ -76,6 +76,8 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
+mod raw;
+
 #[cfg(not(feature = "std"))]
 use alloc::{format, string::String};
 
@@ -84,26 +86,13 @@ use displaydoc::Display;
 use from_enum::From;
 use num_enum::{IntoPrimitive, TryFromPrimitive, TryFromPrimitiveError};
 
-const UNIVERSE_MASK: u64 = 0xFF;
-const UNIVERSE_SHIFT: u64 = 56;
-const ACCOUNT_TYPE_MASK: u64 = 0xF;
-const ACCOUNT_TYPE_SHIFT: u64 = 52;
-const CHAT_FLAGS_MASK: u64 = 0xFF;
-const CHAT_FLAGS_SHIFT: u64 = 42;
-const INSTANCE_MASK: u64 = 0xFFF;
-const INSTANCE_SHIFT: u64 = 32;
-const ACCOUNT_NUMBER_MASK: u64 = 0xFFFF_FFFF;
-const ACCOUNT_NUMBER_SHIFT: u64 = 1;
-const ACCOUNT_ID_MASK: u64 = 0xFFFF_FFFF;
-const ACCOUNT_ID_SHIFT: u64 = 0;
-const AUTH_SERVER_MASK: u64 = 0x1;
-const AUTH_SERVER_SHIFT: u64 = 0;
+pub use raw::SteamId as RawSteamId;
 
 /// Representation of a Steam id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(transparent)]
-pub struct SteamId(u64);
+pub struct SteamId(RawSteamId);
 
 /// Representation of the universe a `SteamId` is associated with.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -337,7 +326,7 @@ impl TryFrom<u32> for AccountNumber {
 impl From<SteamId> for u64 {
     #[inline]
     fn from(steam_id: SteamId) -> Self {
-        steam_id.raw()
+        steam_id.raw().raw()
     }
 }
 
@@ -358,9 +347,10 @@ impl SteamId {
     ///
     /// If you use another library that accepts a [`SteamId`], be forwarned that using the
     /// non-`try_` versions will panic with invalid [`SteamId`] constructed with this method.
+    #[inline]
     #[must_use]
     pub const fn new_unchecked(steam_id: u64) -> Self {
-        SteamId(steam_id)
+        SteamId(RawSteamId::new(steam_id))
     }
 
     /// Constructs a new `SteamId` from a steam64id.
@@ -368,7 +358,7 @@ impl SteamId {
     /// # Errors
     /// This method will return an error if the steam64id is invalid.
     pub fn new(steam_id: u64) -> Result<Self> {
-        let steam_id = Self(steam_id);
+        let steam_id = Self::new_unchecked(steam_id);
         steam_id.try_universe()?;
         steam_id.try_account_type()?;
         steam_id.try_instance()?;
@@ -376,16 +366,18 @@ impl SteamId {
         Ok(steam_id)
     }
 
-    /// Returns the raw `u64` representation of the `SteamId`.
+    /// Returns the raw representation of the `SteamId`.
+    #[inline]
     #[must_use]
-    pub const fn raw(&self) -> u64 {
+    pub const fn raw(&self) -> RawSteamId {
         self.0
     }
 
     /// Returns the raw universe of the `SteamId`.
+    #[inline]
     #[must_use]
     pub const fn raw_universe(&self) -> u8 {
-        ((self.0 >> UNIVERSE_SHIFT) & UNIVERSE_MASK) as u8
+        self.raw().universe()
     }
 
     /// Returns the `Universe` of the `SteamId`.
@@ -406,15 +398,16 @@ impl SteamId {
     }
 
     /// Sets the `Universe` of the `SteamId`.
+    #[inline]
     pub fn set_universe(&mut self, universe: Universe) {
-        self.0 = (self.0 & !(UNIVERSE_MASK << UNIVERSE_SHIFT))
-            | ((u64::from(u8::from(universe)) & UNIVERSE_MASK) << UNIVERSE_SHIFT);
+        *self = Self(self.raw().with_universe(u8::from(universe)));
     }
 
-    /// Returns the account type of the `SteamId`.
+    /// Returns the raw account type of the `SteamId`.
+    #[inline]
     #[must_use]
     pub const fn raw_account_type(&self) -> u8 {
-        ((self.0 >> ACCOUNT_TYPE_SHIFT) & ACCOUNT_TYPE_MASK) as u8
+        self.raw().account_type()
     }
 
     /// Returns the account type of the `SteamId`.
@@ -435,19 +428,20 @@ impl SteamId {
     }
 
     /// Sets the account type of the `SteamId`.
+    #[inline]
     pub fn set_account_type(&mut self, account_type: AccountType) {
         if account_type != AccountType::Chat {
             self.reset_chat_flags();
         }
 
-        self.0 = (self.0 & !(ACCOUNT_TYPE_MASK << ACCOUNT_TYPE_SHIFT))
-            | ((u64::from(u8::from(account_type)) & ACCOUNT_TYPE_MASK) << ACCOUNT_TYPE_SHIFT);
+        *self = Self(self.raw().with_account_type(u8::from(account_type)));
     }
 
     /// Returns the raw chat flags of the `SteamId`.
+    #[inline]
     #[must_use]
     pub const fn raw_chat_flags(&self) -> u32 {
-        ((self.0 >> CHAT_FLAGS_SHIFT) & CHAT_FLAGS_MASK) as u32
+        self.raw().chat_flags()
     }
 
     /// Returns the chat flags of the `SteamId`.
@@ -474,20 +468,22 @@ impl SteamId {
 
     /// Reset the chat flags of the `SteamId`.
     pub fn reset_chat_flags(&mut self) {
-        self.0 &= !(CHAT_FLAGS_MASK << CHAT_FLAGS_SHIFT);
+        *self = Self(self.0.with_chat_flags(0));
     }
 
     /// Sets the chat flags of the `SteamId`.
+    #[inline]
     pub fn set_chat_flags(&mut self, chat_flags: ChatFlags) {
         self.reset_chat_flags();
         self.set_account_type(AccountType::Chat);
-        self.0 |= (u64::from(u32::from(chat_flags)) & CHAT_FLAGS_MASK) << CHAT_FLAGS_SHIFT;
+        *self = Self(self.0.with_chat_flags(u32::from(chat_flags)));
     }
 
     /// Returns the raw instance of the `SteamId`.
+    #[inline]
     #[must_use]
     pub const fn raw_instance(&self) -> u32 {
-        ((self.0 >> INSTANCE_SHIFT) & INSTANCE_MASK) as u32
+        self.raw().instance()
     }
 
     /// Returns the `Instance` of the `SteamId`.
@@ -502,27 +498,30 @@ impl SteamId {
     ///
     /// # Panics
     /// This method panics if the instance is invalid.
+    #[inline]
     #[must_use]
     pub fn instance(&self) -> Instance {
         self.try_instance().unwrap()
     }
 
     /// Sets the instance of the `SteamId`.
+    #[inline]
     pub fn set_instance(&mut self, instance: Instance) {
-        self.0 = (self.0 & !(INSTANCE_MASK << INSTANCE_SHIFT))
-            | ((u64::from(u32::from(instance)) & INSTANCE_MASK) << INSTANCE_SHIFT);
+        *self = Self(self.raw().with_instance(u32::from(instance)));
     }
 
     /// Returns the raw account number of the `SteamId`.
+    #[inline]
     #[must_use]
     pub const fn raw_account_number(&self) -> u32 {
-        ((self.0 & ACCOUNT_NUMBER_MASK) >> ACCOUNT_NUMBER_SHIFT) as u32
+        self.raw().account_number()
     }
 
     /// Returns the `AccountNumber` of the `SteamId`.
     ///
     /// # Errors
     /// This method returns an error if the account number is invalid.
+    #[inline]
     pub const fn try_account_number(&self) -> Result<AccountNumber> {
         AccountNumber::try_from_u32(self.raw_account_number())
     }
@@ -537,34 +536,36 @@ impl SteamId {
     }
 
     /// Sets the `AccountNumber` of the `SteamId`.
+    #[inline]
     pub fn set_account_number(&mut self, account_number: AccountNumber) {
-        self.0 = (self.0 & !(ACCOUNT_NUMBER_MASK << ACCOUNT_NUMBER_SHIFT))
-            | ((u64::from(u32::from(account_number)) & ACCOUNT_NUMBER_MASK)
-                << ACCOUNT_NUMBER_SHIFT);
+        *self = Self(self.raw().with_account_number(u32::from(account_number)));
     }
 
     /// Returns the raw account id of the `SteamId`.
+    #[inline]
     #[must_use]
     pub const fn raw_account_id(&self) -> u32 {
-        ((self.0 & ACCOUNT_ID_MASK) >> ACCOUNT_ID_SHIFT) as u32
+        self.raw().account_id()
     }
 
     /// Returns the `AccountId` of the `SteamId`.
+    #[inline]
     #[must_use]
     pub const fn account_id(&self) -> AccountId {
         AccountId(self.raw_account_id())
     }
 
     /// Sets the `AccountId` of the `SteamId`.
+    #[inline]
     pub fn set_account_id(&mut self, account_id: AccountId) {
-        self.0 = (self.0 & !(ACCOUNT_ID_MASK << ACCOUNT_ID_SHIFT))
-            | ((u64::from(u32::from(account_id)) & ACCOUNT_ID_MASK) << ACCOUNT_ID_SHIFT);
+        *self = Self(self.raw().with_account_id(u32::from(account_id)));
     }
 
     /// Returns the raw auth server portion of the `SteamId`.
+    #[inline]
     #[must_use]
     pub const fn raw_auth_server(&self) -> u8 {
-        ((self.0 >> AUTH_SERVER_SHIFT) & AUTH_SERVER_MASK) as u8
+        self.raw().auth_server()
     }
 
     /// Returns the `AuthServer` of the `SteamId`.
@@ -578,12 +579,13 @@ impl SteamId {
     }
 
     /// Sets the `AuthServer` of the `SteamId`.
+    #[inline]
     pub fn set_auth_server(&mut self, auth_server: AuthServer) {
-        self.0 = (self.0 & !(AUTH_SERVER_MASK << AUTH_SERVER_SHIFT))
-            | (u64::from(u8::from(auth_server)) << AUTH_SERVER_SHIFT);
+        *self = Self(self.raw().with_auth_server(u8::from(auth_server)));
     }
 
     /// Construct a static account key from the static parts of the `SteamId`.
+    #[inline]
     #[must_use]
     pub const fn static_account_key(&self) -> u64 {
         ((self.raw_universe() as u64) << 56)
@@ -723,14 +725,13 @@ impl SteamId {
             })
             .and_then(AccountNumber::try_from)?;
 
-        // All of the parts are valid, so we can use unchecked.
-        Ok(SteamId::new_unchecked(
-            (u64::from(u8::from(universe)) & UNIVERSE_MASK) << UNIVERSE_SHIFT
-                | (u64::from(u8::from(account_type)) & ACCOUNT_TYPE_MASK) << ACCOUNT_TYPE_SHIFT
-                | (u64::from(u32::from(instance)) & INSTANCE_MASK) << INSTANCE_SHIFT
-                | (u64::from(u32::from(account_number)) & ACCOUNT_ID_MASK) << ACCOUNT_NUMBER_SHIFT
-                | (u64::from(u8::from(auth_server)) & AUTH_SERVER_MASK) << AUTH_SERVER_SHIFT,
-        ))
+        let raw_sid = RawSteamId::new(0)
+            .with_universe(u8::from(universe))
+            .with_account_type(u8::from(account_type))
+            .with_instance(u32::from(instance))
+            .with_account_number(u32::from(account_number))
+            .with_auth_server(u8::from(auth_server));
+        Ok(SteamId(raw_sid))
     }
 
     /// Parse steam3id into a `SteamId`.
@@ -794,15 +795,13 @@ impl SteamId {
             _ => default_instance,
         };
 
-        // All of the parts are valid, so we can use unchecked.
-        Ok(SteamId::new_unchecked(
-            (u64::from(u8::from(universe)) & UNIVERSE_MASK) << UNIVERSE_SHIFT
-                | (u64::from(u8::from(account_type)) & ACCOUNT_TYPE_MASK) << ACCOUNT_TYPE_SHIFT
-                | (u64::from(chat_flags.map_or(0, u32::from)) & CHAT_FLAGS_MASK)
-                    << CHAT_FLAGS_SHIFT
-                | (u64::from(u32::from(instance)) & INSTANCE_MASK) << INSTANCE_SHIFT
-                | (u64::from(u32::from(account_id)) & ACCOUNT_ID_MASK) << ACCOUNT_ID_SHIFT,
-        ))
+        let raw_sid = RawSteamId::new(0)
+            .with_universe(u8::from(universe))
+            .with_account_type(u8::from(account_type))
+            .with_instance(u32::from(instance))
+            .with_chat_flags(chat_flags.map_or(0, u32::from))
+            .with_account_id(u32::from(account_id));
+        Ok(SteamId(raw_sid))
     }
 }
 
@@ -820,13 +819,13 @@ mod tests {
     #[test]
     fn steamid_from_steam2id() {
         let steamid = SteamId::parse_steam2id("STEAM_1:1:19461996", None, None).unwrap();
-        assert_eq!(steamid, SteamId(76_561_197_999_189_721));
+        assert_eq!(steamid, SteamId::new_unchecked(76_561_197_999_189_721));
     }
 
     #[test]
     fn steamid_from_steam3id() {
         let steamid = SteamId::parse_steam3id("[U:1:38923993]", None).unwrap();
-        assert_eq!(steamid, SteamId(76_561_197_999_189_721));
+        assert_eq!(steamid, SteamId::new_unchecked(76_561_197_999_189_721));
     }
 
     #[test]

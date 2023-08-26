@@ -22,6 +22,7 @@ derive_more = { version = "0.99", default-features = false, features = ["from", 
 displaydoc = { version = "0.2", default-features = false }
 from-enum = "0.1"
 num_enum = { version = "0.7", default-features = false }
+paste = "1"
 
 serde = { version = "1", default-features = false, features = ["derive"], optional = true }
 
