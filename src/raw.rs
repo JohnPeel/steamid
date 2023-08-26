@@ -2,11 +2,12 @@ use derive_more::{From, Into};
 use paste::paste;
 
 macro_rules! bitfields {
-    ($host_ty:ty; $($(#[$meta:meta])* $vis:vis $ident:ident: $ty:ty = $msb:expr, $lsb:expr);+;) => {$(
+    ($host_ty:ty; $(#[doc = $doc:literal] $(#[$meta:meta])* $vis:vis $ident:ident: $ty:ty = $msb:expr, $lsb:expr);+;) => {$(
         paste! {
             const [<$ident:upper _MASK>]: $host_ty = (1 << ( [<$msb _ $host_ty>] - [<$lsb _ $host_ty>] + 1 )) - 1;
             const [<$ident:upper _SHIFT>]: $host_ty = $lsb;
 
+            #[doc = concat!("Sets ", $doc)]
             $(#[$meta])*
             #[inline]
             #[must_use]
@@ -14,6 +15,7 @@ macro_rules! bitfields {
                 Self((self.0 & !(Self::[<$ident:upper _MASK>] << Self::[<$ident:upper _SHIFT>])) | (((value as $host_ty) & Self::[<$ident:upper _MASK>]) << Self::[<$ident:upper _SHIFT>]))
             }
 
+            #[doc = concat!("Returns ", $doc)]
             $(#[$meta])*
             #[inline]
             #[must_use]
@@ -49,20 +51,20 @@ impl SteamId {
     bitfields! {
         u64;
 
-        /// The raw auth server portion of the `SteamId`.
+        /// the raw auth server portion of the `SteamId`.
         pub auth_server: u8 = 0, 0;
-        /// The raw account number portion of the `SteamId`.
+        /// the raw account number portion of the `SteamId`.
         pub account_number: u32 = 31, 1;
-        /// The raw account id portion of the `SteamId`.
+        /// the raw account id portion of the `SteamId`.
         pub account_id: u32 = 31, 0;
-        /// The raw instance portion of the `SteamId`.
+        /// the raw instance portion of the `SteamId`.
         pub instance: u32 = 51, 32;
-        /// The raw account type portion of the `SteamId`.
+        /// the raw account type portion of the `SteamId`.
         pub account_type: u8 = 55, 52;
-        /// The raw universe portion of the `SteamId`.
+        /// the raw universe portion of the `SteamId`.
         pub universe: u8 = 63, 56;
 
-        /// The raw chat flags portion of the `SteamId`.
+        /// the raw chat flags portion of the `SteamId`.
         pub chat_flags: u32 = 49, 42;
     }
 }
