@@ -76,380 +76,26 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
-/// Error types.
-pub mod error;
+mod error;
+mod macros;
+mod parts;
 mod raw;
 
 #[cfg(not(feature = "std"))]
 use alloc::{format, string::String};
 
-use error::{
-    InvalidAccountNumber, InvalidAccountType, InvalidAuthServer, InvalidChatFlags, InvalidInstance,
-    InvalidUniverse,
+pub use self::error::{Error, InvalidValue};
+pub use self::parts::{
+    AccountId, AccountNumber, AccountType, AuthServer, ChatFlags, Instance, Universe,
 };
-use from_enum::From;
-
-pub use self::error::{Error, Result};
 pub use self::raw::RawSteamId;
 
-/// Representation of a Steam id.
+use self::macros::forward_impl;
+
+/// A Steam ID.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(transparent)]
 pub struct SteamId(RawSteamId);
-
-macro_rules! into_repr {
-    ($ty:ty => $prim:ty) => {
-        paste::paste! {
-            impl $ty {
-                #[doc = concat!("Converts `", stringify!($ty), "` into a `", stringify!($prim), "`.")]
-                #[inline]
-                #[must_use]
-                pub const fn [<into_ $prim>](self) -> $prim {
-                    self as $prim
-                }
-            }
-
-            impl From<$ty> for $prim {
-                #[inline]
-                fn from(value: $ty) -> $prim {
-                    value.[<into_ $prim>]()
-                }
-            }
-
-            impl TryFrom<$prim> for $ty {
-                type Error = [<Invalid $ty>];
-
-                #[inline]
-                fn try_from(value: $prim) -> Result<Self, Self::Error> {
-                    Self::[<try_from_ $prim>](value)
-                }
-            }
-        }
-    };
-}
-
-/// Representation of the universe a `SteamId` is associated with.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[repr(u8)]
-pub enum Universe {
-    /// Invalid.
-    Invalid = 0,
-    /// The standard public universe.
-    Public = 1,
-    /// Beta universe used inside Valve.
-    Beta = 2,
-    /// Internal universe used inside Valve.
-    Internal = 3,
-    /// Dev universe used inside Valve.
-    Developer = 4,
-    /// RC (this doesn't exist in the steam_api documentation)
-    Rc = 5,
-}
-into_repr!(Universe => u8);
-
-impl Universe {
-    /// Converts the `u8` into a `Universe`.
-    ///
-    /// # Errors
-    /// `u8` outside of the range `0..=5` are invalid.
-    #[inline]
-    pub const fn try_from_u8(value: u8) -> Result<Self, InvalidUniverse> {
-        Ok(match value {
-            0 => Self::Invalid,
-            1 => Self::Public,
-            2 => Self::Beta,
-            3 => Self::Internal,
-            4 => Self::Developer,
-            5 => Self::Rc,
-            _ => return Err(InvalidUniverse(value)),
-        })
-    }
-}
-
-/// Representation of an account type for a `SteamId`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[repr(u8)]
-pub enum AccountType {
-    /// Used for invalid Steam IDs.
-    Invalid = 0,
-    /// Regular user account.
-    Individual = 1,
-    /// Multiseat (e.g. cybercafe) account.
-    Multiseat = 2,
-    /// Persistent (not anonymous) game server account.
-    GameServer = 3,
-    /// Anonymous game server account.
-    ///
-    /// The format of this type is still unknown, and they will not work with this library.
-    AnonGameServer = 4,
-    /// Pending.
-    Pending = 5,
-    /// Valve internal content server account.
-    ContentServer = 6,
-    /// Steam Group (clan).
-    Clan = 7,
-    /// Steam group chat or lobby.
-    Chat = 8,
-    /// Fake Steam ID for local PSN account on PS3 or Live account on 360, etc.
-    ConsoleUser = 9,
-    /// Anonymous user account. (Used to create an account or reset a password)
-    AnonUser = 10,
-}
-into_repr!(AccountType => u8);
-
-impl AccountType {
-    /// Returns the character representation of the `AccountType` (if possible).
-    ///
-    /// # Errors
-    /// `AccountType` without a character representation will result in an error.
-    pub const fn try_into_char(&self) -> Result<char, Error> {
-        Ok(match self {
-            Self::Invalid => 'I',
-            Self::Individual => 'U',
-            Self::Multiseat => 'M',
-            Self::GameServer => 'G',
-            Self::AnonGameServer => 'A',
-            Self::Pending => 'P',
-            Self::ContentServer => 'C',
-            Self::Clan => 'g',
-            Self::Chat => 'T',
-            Self::ConsoleUser => return Err(Error::NoCharacterRepresentation(*self)),
-            Self::AnonUser => 'a',
-        })
-    }
-
-    /// Construct an `AccountType` from the character representation (if possible).
-    ///
-    /// # Errors
-    /// Invalid character representations will result in an error.
-    pub const fn try_from_char(value: char) -> Result<Self, Error> {
-        Ok(match value {
-            'I' => Self::Invalid,
-            'U' => Self::Individual,
-            'M' => Self::Multiseat,
-            'G' => Self::GameServer,
-            'A' => Self::AnonGameServer,
-            'P' => Self::Pending,
-            'C' => Self::ContentServer,
-            'g' => Self::Clan,
-            'T' | 'L' | 'c' => Self::Chat,
-            'a' => Self::AnonUser,
-            _ => return Err(Error::InvalidCharacterRepresentation(value)),
-        })
-    }
-
-    /// Converts the `u8` into a `AccountType`.
-    ///
-    /// # Errors
-    /// `u8` outside of the range `0..=10` are invalid.
-    #[inline]
-    pub const fn try_from_u8(value: u8) -> Result<Self, InvalidAccountType> {
-        Ok(match value {
-            0 => Self::Invalid,
-            1 => Self::Individual,
-            2 => Self::Multiseat,
-            3 => Self::GameServer,
-            4 => Self::AnonGameServer,
-            5 => Self::Pending,
-            6 => Self::ContentServer,
-            7 => Self::Clan,
-            8 => Self::Chat,
-            9 => Self::ConsoleUser,
-            10 => Self::AnonUser,
-            _ => return Err(InvalidAccountType(value)),
-        })
-    }
-}
-
-impl TryFrom<char> for AccountType {
-    type Error = Error;
-
-    #[inline]
-    fn try_from(value: char) -> Result<Self, Self::Error> {
-        Self::try_from_char(value)
-    }
-}
-
-impl TryFrom<AccountType> for char {
-    type Error = Error;
-
-    #[inline]
-    fn try_from(value: AccountType) -> Result<Self> {
-        value.try_into_char()
-    }
-}
-
-/// Representation of chat flags for a `SteamId`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[repr(u32)]
-pub enum ChatFlags {
-    /// Clan based chat
-    Clan = 1 << 7,
-    /// Lobby based chat
-    Lobby = 1 << 6,
-    /// Matchmaking lobby based chat
-    MatchmakingLobby = 1 << 5,
-}
-into_repr!(ChatFlags => u32);
-
-impl ChatFlags {
-    /// Construct an `ChatFlags` given a `u32`.
-    ///
-    /// # Errors
-    /// `value` must be valid chat flags.
-    #[inline]
-    pub const fn try_from_u32(value: u32) -> Result<Self, InvalidChatFlags> {
-        Ok(match value {
-            128 => Self::Clan,
-            64 => Self::Lobby,
-            32 => Self::MatchmakingLobby,
-            _ => return Err(InvalidChatFlags(value)),
-        })
-    }
-}
-
-/// Representation of an instance for a `SteamId`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[repr(u32)]
-pub enum Instance {
-    /// All
-    All = 0,
-    /// Desktop
-    Desktop = 1,
-    /// Console
-    Console = 2,
-    /// Web
-    Web = 4,
-}
-into_repr!(Instance => u32);
-
-impl Instance {
-    /// Construct an `Instance` given a `u32`.
-    ///
-    /// # Errors
-    /// `value` must be a valid instance: `0..3 | 4`.
-    #[inline]
-    pub const fn try_from_u32(value: u32) -> Result<Self, InvalidInstance> {
-        Ok(match value {
-            0 => Self::All,
-            1 => Self::Desktop,
-            2 => Self::Console,
-            4 => Self::Web,
-            _ => return Err(InvalidInstance(value)),
-        })
-    }
-}
-
-/// Representation of an account number for a `SteamId`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[repr(transparent)]
-pub struct AccountNumber(u32);
-
-impl AccountNumber {
-    /// Returns the inner `u32`.
-    #[inline]
-    #[must_use]
-    pub const fn into_inner(self) -> u32 {
-        self.0
-    }
-
-    /// Converts an `AccountNumber` into a `u32`.
-    #[inline]
-    #[must_use]
-    pub const fn into_u32(self) -> u32 {
-        self.0
-    }
-
-    /// Construct an `AccountNumber` given a `u32`.
-    ///
-    /// # Errors
-    /// Account numbers are restricted to below `0x7FFF_FFFF`.
-    #[inline]
-    pub const fn try_from_u32(value: u32) -> Result<Self, InvalidAccountNumber> {
-        if value > 0x7FFF_FFFF {
-            return Err(InvalidAccountNumber(value));
-        }
-        Ok(Self(value))
-    }
-}
-
-/// Representation of an account id for a `SteamId`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[repr(transparent)]
-pub struct AccountId(u32);
-
-impl AccountId {
-    /// Returns the inner `u32`.
-    #[inline]
-    #[must_use]
-    pub const fn into_inner(self) -> u32 {
-        self.0
-    }
-
-    /// Converts an `AccountId` into a `u32`.
-    #[inline]
-    #[must_use]
-    pub const fn into_u32(self) -> u32 {
-        self.0
-    }
-
-    /// Construct an `AccountId` given a `u32`.
-    #[inline]
-    #[must_use]
-    pub const fn from_u32(value: u32) -> Self {
-        Self(value)
-    }
-}
-
-/// Which auth server is used for a `SteamId`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[repr(u8)]
-pub enum AuthServer {
-    /// 0
-    Zero = 0,
-    /// 1
-    One = 1,
-}
-into_repr!(AuthServer => u8);
-
-impl AuthServer {
-    /// Construct an `AuthServer` given a `u8`.
-    ///
-    /// # Errors
-    /// Only `0` and `1` are valid values for `AuthServer`.
-    #[inline]
-    pub const fn try_from_u8(value: u8) -> Result<Self, InvalidAuthServer> {
-        Ok(match value {
-            0 => Self::Zero,
-            1 => Self::One,
-            _ => return Err(InvalidAuthServer(value)),
-        })
-    }
-}
-
-impl From<SteamId> for u64 {
-    #[inline]
-    fn from(steam_id: SteamId) -> Self {
-        steam_id.into_inner().into_inner()
-    }
-}
-
-impl TryFrom<u64> for SteamId {
-    type Error = Error;
-
-    #[inline]
-    fn try_from(steam_id: u64) -> Result<Self, Self::Error> {
-        Self::new(steam_id)
-    }
-}
 
 impl SteamId {
     /// Contructs a new `SteamId` from a raw u64.
@@ -459,7 +105,6 @@ impl SteamId {
     ///
     /// If you use another library that accepts a [`SteamId`], be forwarned that using the
     /// non-`try_` versions will panic with invalid [`SteamId`] constructed with this method.
-    #[inline]
     #[must_use]
     pub const fn new_unchecked(steam_id: u64) -> Self {
         SteamId(RawSteamId::new(steam_id))
@@ -469,24 +114,38 @@ impl SteamId {
     ///
     /// # Errors
     /// This method will return an error if the steam64id is invalid.
-    pub fn new(steam_id: u64) -> Result<Self> {
+    pub const fn new(steam_id: u64) -> Result<Self, Error> {
         let steam_id = Self::new_unchecked(steam_id);
-        steam_id.try_universe()?;
-        steam_id.try_account_type()?;
-        steam_id.try_instance()?;
-        steam_id.try_account_number()?;
+
+        if let Err(error) = steam_id.try_universe() {
+            return Err(error);
+        }
+        if let Err(error) = steam_id.try_account_type() {
+            return Err(error);
+        }
+        if let Err(error) = steam_id.try_instance() {
+            return Err(error);
+        }
+        if let Err(error) = steam_id.try_account_number() {
+            return Err(error);
+        }
+
         Ok(steam_id)
     }
 
-    /// Returns the raw representation of the `SteamId`.
-    #[inline]
+    /// Returns the inner `u64`.
     #[must_use]
-    pub const fn into_inner(&self) -> RawSteamId {
+    pub const fn into_u64(self) -> u64 {
+        self.0.into_inner()
+    }
+
+    /// Returns the inner `RawSteamId`.
+    #[must_use]
+    pub const fn into_inner(self) -> RawSteamId {
         self.0
     }
 
     /// Returns the raw universe of the `SteamId`.
-    #[inline]
     #[must_use]
     pub const fn raw_universe(&self) -> u8 {
         self.into_inner().universe()
@@ -496,7 +155,7 @@ impl SteamId {
     ///
     /// # Errors
     /// This method returns an error if the universe is invalid.
-    pub const fn try_universe(&self) -> Result<Universe> {
+    pub const fn try_universe(&self) -> Result<Universe, Error> {
         match Universe::try_from_u8(self.raw_universe()) {
             Ok(universe) => Ok(universe),
             Err(error) => Err(Error::InvalidUniverse(error)),
@@ -513,13 +172,11 @@ impl SteamId {
     }
 
     /// Sets the `Universe` of the `SteamId`.
-    #[inline]
     pub fn set_universe(&mut self, universe: Universe) {
         *self = Self(self.into_inner().with_universe(u8::from(universe)));
     }
 
     /// Returns the raw account type of the `SteamId`.
-    #[inline]
     #[must_use]
     pub const fn raw_account_type(&self) -> u8 {
         self.into_inner().account_type()
@@ -529,7 +186,7 @@ impl SteamId {
     ///
     /// # Errors
     /// This method returns an error if the account type is invalid.
-    pub const fn try_account_type(&self) -> Result<AccountType> {
+    pub const fn try_account_type(&self) -> Result<AccountType, Error> {
         match AccountType::try_from_u8(self.raw_account_type()) {
             Ok(universe) => Ok(universe),
             Err(error) => Err(Error::InvalidAccountType(error)),
@@ -546,7 +203,6 @@ impl SteamId {
     }
 
     /// Sets the account type of the `SteamId`.
-    #[inline]
     pub fn set_account_type(&mut self, account_type: AccountType) {
         if account_type != AccountType::Chat {
             self.reset_chat_flags();
@@ -556,7 +212,6 @@ impl SteamId {
     }
 
     /// Returns the raw chat flags of the `SteamId`.
-    #[inline]
     #[must_use]
     pub const fn raw_chat_flags(&self) -> u32 {
         self.into_inner().chat_flags()
@@ -566,7 +221,7 @@ impl SteamId {
     ///
     /// # Errors
     /// This method returns an error if the chat flags are invalid.
-    pub const fn try_chat_flags(&self) -> Result<Option<ChatFlags>> {
+    pub const fn try_chat_flags(&self) -> Result<Option<ChatFlags>, Error> {
         let chat_flags = self.raw_chat_flags();
         if chat_flags == 0 {
             return Ok(None);
@@ -593,7 +248,6 @@ impl SteamId {
     }
 
     /// Sets the chat flags of the `SteamId`.
-    #[inline]
     pub fn set_chat_flags(&mut self, chat_flags: ChatFlags) {
         self.reset_chat_flags();
         self.set_account_type(AccountType::Chat);
@@ -601,7 +255,6 @@ impl SteamId {
     }
 
     /// Returns the raw instance of the `SteamId`.
-    #[inline]
     #[must_use]
     pub const fn raw_instance(&self) -> u32 {
         self.into_inner().instance()
@@ -611,7 +264,7 @@ impl SteamId {
     ///
     /// # Errors
     /// This method returns an error if the instance is invalid.
-    pub const fn try_instance(&self) -> Result<Instance> {
+    pub const fn try_instance(&self) -> Result<Instance, Error> {
         match Instance::try_from_u32(self.raw_instance()) {
             Ok(instance) => Ok(instance),
             Err(error) => Err(Error::InvalidInstance(error)),
@@ -622,20 +275,17 @@ impl SteamId {
     ///
     /// # Panics
     /// This method panics if the instance is invalid.
-    #[inline]
     #[must_use]
     pub fn instance(&self) -> Instance {
         self.try_instance().unwrap()
     }
 
     /// Sets the instance of the `SteamId`.
-    #[inline]
     pub fn set_instance(&mut self, instance: Instance) {
         *self = Self(self.into_inner().with_instance(u32::from(instance)));
     }
 
     /// Returns the raw account number of the `SteamId`.
-    #[inline]
     #[must_use]
     pub const fn raw_account_number(&self) -> u32 {
         self.into_inner().account_number()
@@ -645,8 +295,7 @@ impl SteamId {
     ///
     /// # Errors
     /// This method returns an error if the account number is invalid.
-    #[inline]
-    pub const fn try_account_number(&self) -> Result<AccountNumber> {
+    pub const fn try_account_number(&self) -> Result<AccountNumber, Error> {
         match AccountNumber::try_from_u32(self.raw_account_number()) {
             Ok(account_number) => Ok(account_number),
             Err(error) => Err(Error::InvalidAccountNumber(error)),
@@ -663,7 +312,6 @@ impl SteamId {
     }
 
     /// Sets the `AccountNumber` of the `SteamId`.
-    #[inline]
     pub fn set_account_number(&mut self, account_number: AccountNumber) {
         *self = Self(
             self.into_inner()
@@ -672,27 +320,23 @@ impl SteamId {
     }
 
     /// Returns the raw account id of the `SteamId`.
-    #[inline]
     #[must_use]
     pub const fn raw_account_id(&self) -> u32 {
         self.into_inner().account_id()
     }
 
     /// Returns the `AccountId` of the `SteamId`.
-    #[inline]
     #[must_use]
     pub const fn account_id(&self) -> AccountId {
-        AccountId(self.raw_account_id())
+        AccountId::from_u32(self.raw_account_id())
     }
 
     /// Sets the `AccountId` of the `SteamId`.
-    #[inline]
     pub fn set_account_id(&mut self, account_id: AccountId) {
         *self = Self(self.into_inner().with_account_id(account_id.into_u32()));
     }
 
     /// Returns the raw auth server portion of the `SteamId`.
-    #[inline]
     #[must_use]
     pub const fn raw_auth_server(&self) -> u8 {
         self.into_inner().auth_server()
@@ -709,13 +353,11 @@ impl SteamId {
     }
 
     /// Sets the `AuthServer` of the `SteamId`.
-    #[inline]
     pub fn set_auth_server(&mut self, auth_server: AuthServer) {
         *self = Self(self.into_inner().with_auth_server(u8::from(auth_server)));
     }
 
     /// Construct a static account key from the static parts of the `SteamId`.
-    #[inline]
     #[must_use]
     pub const fn static_account_key(&self) -> u64 {
         ((self.raw_universe() as u64) << 56)
@@ -727,7 +369,7 @@ impl SteamId {
     ///
     /// # Errors
     /// This method returns an error if the universe or account number are invalid.
-    pub fn try_steam2id(&self) -> Result<String> {
+    pub fn try_steam2id(&self) -> Result<String, Error> {
         Ok(format!(
             "STEAM_{}:{}:{}",
             self.try_universe()?.into_u8(),
@@ -749,7 +391,7 @@ impl SteamId {
     ///
     /// # Errors
     /// This method returns an error if the account type or universe are invalid.
-    pub fn try_steam3id(&self) -> Result<String> {
+    pub fn try_steam3id(&self) -> Result<String, Error> {
         let account_type = self.try_account_type()?;
         let instance = matches!(
             account_type,
@@ -764,11 +406,15 @@ impl SteamId {
                 Some(ChatFlags::Clan) => 'c',
                 Some(ChatFlags::Lobby) => 'L',
                 Some(ChatFlags::MatchmakingLobby) => {
-                    return Err(Error::NoCharacterRepresentation(AccountType::Chat))
+                    return Err(Error::NoCharacterRepresentation(InvalidValue::new(
+                        AccountType::Chat,
+                    )))
                 }
-                None => char::try_from(AccountType::Chat)?,
+                None => {
+                    char::try_from(AccountType::Chat).map_err(Error::NoCharacterRepresentation)?
+                }
             },
-            value => char::try_from(value)?,
+            value => char::try_from(value).map_err(Error::NoCharacterRepresentation)?,
         };
 
         Ok(format!(
@@ -793,13 +439,14 @@ impl SteamId {
     ///
     /// This method keeps the account number that same, but sets other parameters to their defaults.
     #[must_use]
-    pub fn generalize(&self) -> Self {
-        let mut steamid = *self;
-        steamid.reset_chat_flags();
-        steamid.set_universe(Universe::Public);
-        steamid.set_account_type(AccountType::Individual);
-        steamid.set_instance(Instance::Desktop);
-        steamid
+    pub const fn generalize(&self) -> Self {
+        Self(
+            self.into_inner()
+                .with_chat_flags(0)
+                .with_universe(Universe::Public.into_u8())
+                .with_account_type(AccountType::Individual.into_u8())
+                .with_instance(Instance::Desktop.into_u32()),
+        )
     }
 
     /// Returns the community link for the `SteamId`.
@@ -807,7 +454,7 @@ impl SteamId {
     pub fn community_link(&self) -> String {
         format!(
             "https://steamcommunity.com/profiles/{}",
-            u64::from(self.generalize())
+            self.generalize().into_u64()
         )
     }
 
@@ -819,7 +466,7 @@ impl SteamId {
         value: S,
         account_type: impl Into<Option<AccountType>>,
         instance: impl Into<Option<Instance>>,
-    ) -> Result<Self> {
+    ) -> Result<Self, Error> {
         let value = value.as_ref();
         let account_type = account_type.into().unwrap_or(AccountType::Individual);
         let instance = instance.into().unwrap_or(Instance::Desktop);
@@ -837,7 +484,7 @@ impl SteamId {
                 v.parse::<u8>()
                     .map_err(|_| Error::ParseError("universe is not an integer"))
             })
-            .and_then(|v| Ok(Universe::try_from_u8(v)?))?;
+            .and_then(|v| Universe::try_from_u8(v).map_err(Error::InvalidUniverse))?;
         let auth_server = parts
             .next()
             .ok_or(Error::ParseError("missing auth server"))
@@ -845,7 +492,7 @@ impl SteamId {
                 v.parse::<u8>()
                     .map_err(|_| Error::ParseError("auth server is not an integer"))
             })
-            .and_then(|v| Ok(AuthServer::try_from_u8(v)?))?;
+            .and_then(|v| AuthServer::try_from_u8(v).map_err(Error::InvalidAuthServer))?;
         let account_number = parts
             .next()
             .ok_or(Error::ParseError("missing account number"))
@@ -853,7 +500,7 @@ impl SteamId {
                 v.parse::<u32>()
                     .map_err(|_| Error::ParseError("account number is not an integer"))
             })
-            .and_then(|v| Ok(AccountNumber::try_from_u32(v)?))?;
+            .and_then(|v| AccountNumber::try_from_u32(v).map_err(Error::InvalidAccountNumber))?;
 
         let raw_sid = RawSteamId::new(0)
             .with_universe(universe.into_u8())
@@ -871,7 +518,7 @@ impl SteamId {
     pub fn parse_steam3id<S: AsRef<str>>(
         value: S,
         default_instance: impl Into<Option<Instance>>,
-    ) -> Result<Self> {
+    ) -> Result<Self, Error> {
         let mut value = value.as_ref();
         let default_instance = default_instance.into().unwrap_or(Instance::All);
 
@@ -893,7 +540,8 @@ impl SteamId {
             'L' => Some(ChatFlags::Lobby),
             _ => None,
         };
-        let account_type = AccountType::try_from(account_type)?;
+        let account_type =
+            AccountType::try_from(account_type).map_err(Error::InvalidCharacterRepresentation)?;
         let universe = parts
             .next()
             .ok_or(Error::ParseError("missing universe"))
@@ -901,7 +549,7 @@ impl SteamId {
                 v.parse::<u8>()
                     .map_err(|_| Error::ParseError("universe is not an integer"))
             })
-            .and_then(|v| Ok(Universe::try_from(v)?))?;
+            .and_then(|v| Universe::try_from(v).map_err(Error::InvalidUniverse))?;
         let account_id = parts
             .next()
             .ok_or(Error::ParseError("missing account id"))
@@ -921,7 +569,7 @@ impl SteamId {
                     v.parse::<u32>()
                         .map_err(|_| Error::ParseError("instance is not an integer"))
                 })
-                .map(Instance::try_from)??,
+                .map(|v| Instance::try_from(v).map_err(Error::InvalidInstance))??,
             _ => default_instance,
         };
 
@@ -934,6 +582,10 @@ impl SteamId {
         Ok(SteamId(raw_sid))
     }
 }
+
+forward_impl!(use into_inner; impl Into<RawSteamId> for SteamId);
+forward_impl!(use into_u64; impl Into<u64> for SteamId);
+forward_impl!(use new; impl TryFrom<u64, Error = Error> for SteamId);
 
 #[cfg(test)]
 mod tests {

@@ -1,31 +1,29 @@
-use displaydoc::Display;
-use from_enum::From;
+use core::fmt;
 
-// Allow these to be unused as we use them in the macro to construct names.
-// Clippy still considers them unused though.
-#[allow(unused_imports)]
-use super::{AccountId, AccountNumber, AccountType, AuthServer, ChatFlags, Instance, Universe};
+use displaydoc::Display;
+
+use super::AccountType;
 
 /// Error type for crate.
-#[derive(Debug, Display, From)]
+#[derive(Debug, Display)]
 pub enum Error {
     /// invalid universe: {0}
-    InvalidUniverse(#[from] InvalidUniverse),
+    InvalidUniverse(InvalidValue<u8>),
     /// invalid account type: {0}
-    InvalidAccountType(#[from] InvalidAccountType),
+    InvalidAccountType(InvalidValue<u8>),
     /// invalid chat flags: {0}
-    InvalidChatFlags(#[from] InvalidChatFlags),
+    InvalidChatFlags(InvalidValue<u32>),
     /// invalid instance: {0}
-    InvalidInstance(#[from] InvalidInstance),
+    InvalidInstance(InvalidValue<u32>),
     /// invalid account number: {0}
-    InvalidAccountNumber(#[from] InvalidAccountNumber),
+    InvalidAccountNumber(InvalidValue<u32>),
     /// invalid auth server: {0}
-    InvalidAuthServer(#[from] InvalidAuthServer),
-
+    InvalidAuthServer(InvalidValue<u8>),
     /// account type does not have a character representation: {0:?}
-    NoCharacterRepresentation(AccountType),
+    NoCharacterRepresentation(InvalidValue<AccountType>),
     /// character representation is not a valid account type: {0}
-    InvalidCharacterRepresentation(char),
+    InvalidCharacterRepresentation(InvalidValue<char>),
+
     /// parse error: {0}
     ParseError(&'static str),
 }
@@ -33,43 +31,34 @@ pub enum Error {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
-/// Result type for crate.
-pub type Result<T, E = Error> = core::result::Result<T, E>;
+/// Represents an invalid value.
+#[derive(Clone, Copy, Debug)]
+pub struct InvalidValue<T>(T);
 
-macro_rules! into_error {
-    ($($ty:ty => $prim:ty);+;) => {
-        paste::paste! {$(
-            #[doc = concat!("invalid ", stringify!($ty:lower))]
-            #[derive(Clone, Copy, Debug)]
-            pub struct [<Invalid $ty>](pub(crate) $prim);
+impl<T> InvalidValue<T> {
+    #[must_use]
+    pub(crate) const fn new(value: T) -> Self {
+        Self(value)
+    }
 
-            #[cfg(feature = "std")]
-            impl std::error::Error for [<Invalid $ty>] {}
+    /// Returns a reference to the inner `T`.
+    #[must_use]
+    pub const fn as_inner(&self) -> &T {
+        &self.0
+    }
 
-            impl [<Invalid $ty>] {
-                /// Returns the invalid u8.
-                #[inline]
-                #[must_use]
-                pub const fn into_inner(self) -> $prim {
-                    self.0
-                }
-            }
-
-            impl core::fmt::Display for [<Invalid $ty>] {
-                fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                    write!(f, "{} is not a valid value", self.0)
-                }
-            }
-        )+}
-    };
+    /// Returns the inner `T`.
+    #[must_use]
+    pub fn into_inner(self) -> T {
+        self.0
+    }
 }
 
-into_error! {
-    Universe => u8;
-    AccountType => u8;
-    ChatFlags => u32;
-    Instance => u32;
-    AccountNumber => u32;
-    AccountId => u32;
-    AuthServer => u8;
+impl<T: fmt::Display> fmt::Display for InvalidValue<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_inner().fmt(f)
+    }
 }
+
+#[cfg(feature = "std")]
+impl<T: fmt::Debug + fmt::Display> std::error::Error for InvalidValue<T> {}
