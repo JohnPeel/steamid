@@ -57,7 +57,7 @@ impl RawSteamId {
     /// Returns the raw `u64` representation of the `SteamId`.
     #[inline]
     #[must_use]
-    pub const fn raw(self) -> u64 {
+    pub const fn into_inner(self) -> u64 {
         self.0
     }
 

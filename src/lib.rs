@@ -438,7 +438,7 @@ impl AuthServer {
 impl From<SteamId> for u64 {
     #[inline]
     fn from(steam_id: SteamId) -> Self {
-        steam_id.raw().raw()
+        steam_id.into_inner().into_inner()
     }
 }
 
@@ -481,7 +481,7 @@ impl SteamId {
     /// Returns the raw representation of the `SteamId`.
     #[inline]
     #[must_use]
-    pub const fn raw(&self) -> RawSteamId {
+    pub const fn into_inner(&self) -> RawSteamId {
         self.0
     }
 
@@ -489,7 +489,7 @@ impl SteamId {
     #[inline]
     #[must_use]
     pub const fn raw_universe(&self) -> u8 {
-        self.raw().universe()
+        self.into_inner().universe()
     }
 
     /// Returns the `Universe` of the `SteamId`.
@@ -515,14 +515,14 @@ impl SteamId {
     /// Sets the `Universe` of the `SteamId`.
     #[inline]
     pub fn set_universe(&mut self, universe: Universe) {
-        *self = Self(self.raw().with_universe(u8::from(universe)));
+        *self = Self(self.into_inner().with_universe(u8::from(universe)));
     }
 
     /// Returns the raw account type of the `SteamId`.
     #[inline]
     #[must_use]
     pub const fn raw_account_type(&self) -> u8 {
-        self.raw().account_type()
+        self.into_inner().account_type()
     }
 
     /// Returns the account type of the `SteamId`.
@@ -552,14 +552,14 @@ impl SteamId {
             self.reset_chat_flags();
         }
 
-        *self = Self(self.raw().with_account_type(u8::from(account_type)));
+        *self = Self(self.into_inner().with_account_type(u8::from(account_type)));
     }
 
     /// Returns the raw chat flags of the `SteamId`.
     #[inline]
     #[must_use]
     pub const fn raw_chat_flags(&self) -> u32 {
-        self.raw().chat_flags()
+        self.into_inner().chat_flags()
     }
 
     /// Returns the chat flags of the `SteamId`.
@@ -604,7 +604,7 @@ impl SteamId {
     #[inline]
     #[must_use]
     pub const fn raw_instance(&self) -> u32 {
-        self.raw().instance()
+        self.into_inner().instance()
     }
 
     /// Returns the `Instance` of the `SteamId`.
@@ -631,14 +631,14 @@ impl SteamId {
     /// Sets the instance of the `SteamId`.
     #[inline]
     pub fn set_instance(&mut self, instance: Instance) {
-        *self = Self(self.raw().with_instance(u32::from(instance)));
+        *self = Self(self.into_inner().with_instance(u32::from(instance)));
     }
 
     /// Returns the raw account number of the `SteamId`.
     #[inline]
     #[must_use]
     pub const fn raw_account_number(&self) -> u32 {
-        self.raw().account_number()
+        self.into_inner().account_number()
     }
 
     /// Returns the `AccountNumber` of the `SteamId`.
@@ -665,14 +665,17 @@ impl SteamId {
     /// Sets the `AccountNumber` of the `SteamId`.
     #[inline]
     pub fn set_account_number(&mut self, account_number: AccountNumber) {
-        *self = Self(self.raw().with_account_number(account_number.into_u32()));
+        *self = Self(
+            self.into_inner()
+                .with_account_number(account_number.into_u32()),
+        );
     }
 
     /// Returns the raw account id of the `SteamId`.
     #[inline]
     #[must_use]
     pub const fn raw_account_id(&self) -> u32 {
-        self.raw().account_id()
+        self.into_inner().account_id()
     }
 
     /// Returns the `AccountId` of the `SteamId`.
@@ -685,14 +688,14 @@ impl SteamId {
     /// Sets the `AccountId` of the `SteamId`.
     #[inline]
     pub fn set_account_id(&mut self, account_id: AccountId) {
-        *self = Self(self.raw().with_account_id(account_id.into_u32()));
+        *self = Self(self.into_inner().with_account_id(account_id.into_u32()));
     }
 
     /// Returns the raw auth server portion of the `SteamId`.
     #[inline]
     #[must_use]
     pub const fn raw_auth_server(&self) -> u8 {
-        self.raw().auth_server()
+        self.into_inner().auth_server()
     }
 
     /// Returns the `AuthServer` of the `SteamId`.
@@ -708,7 +711,7 @@ impl SteamId {
     /// Sets the `AuthServer` of the `SteamId`.
     #[inline]
     pub fn set_auth_server(&mut self, auth_server: AuthServer) {
-        *self = Self(self.raw().with_auth_server(u8::from(auth_server)));
+        *self = Self(self.into_inner().with_auth_server(u8::from(auth_server)));
     }
 
     /// Construct a static account key from the static parts of the `SteamId`.
