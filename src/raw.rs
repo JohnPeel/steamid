@@ -1,4 +1,3 @@
-use derive_more::{From, Into};
 use paste::paste;
 
 macro_rules! bitfields {
@@ -29,10 +28,23 @@ macro_rules! bitfields {
 /// Raw representation of a Steam id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(From, Into)]
 #[repr(transparent)]
 #[allow(clippy::module_name_repetitions)]
 pub struct RawSteamId(u64);
+
+impl From<u64> for RawSteamId {
+    #[inline]
+    fn from(value: u64) -> Self {
+        Self(value)
+    }
+}
+
+impl From<RawSteamId> for u64 {
+    #[inline]
+    fn from(value: RawSteamId) -> Self {
+        value.0
+    }
+}
 
 impl RawSteamId {
     /// Construct a new `SteamId` from a [`u64`].
