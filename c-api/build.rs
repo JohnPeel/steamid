@@ -8,13 +8,11 @@ fn main() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    let config = cbindgen::Config {
-        enumeration: cbindgen::EnumConfig {
-            prefix_with_name: true,
-            ..Default::default()
-        },
-        ..Default::default()
-    };
+    let mut config = cbindgen::Config::default();
+    //config.after_includes = Some(String::from("typedef uint64_t RawSteamId;"));
+    config.enumeration.prefix_with_name = true;
+    config.pragma_once = true;
+    config.cpp_compat = true;
 
     cbindgen::Builder::new()
         .with_config(config)
@@ -22,6 +20,7 @@ fn main() {
         .with_language(Language::C)
         .with_parse_deps(true)
         .with_parse_include(&["steamid"])
+        .include_item("RawSteamId")
         .generate()
         .expect("failed to generate C bindings")
         .write_to_file(out_dir.join("steamid.h"));

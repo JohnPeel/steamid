@@ -86,7 +86,7 @@ use displaydoc::Display;
 use from_enum::From;
 use num_enum::{IntoPrimitive, TryFromPrimitive, TryFromPrimitiveError};
 
-pub use raw::SteamId as RawSteamId;
+pub use self::raw::RawSteamId;
 
 /// Representation of a Steam id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

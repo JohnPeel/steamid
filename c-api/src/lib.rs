@@ -2,15 +2,18 @@
 
 extern crate alloc;
 
-use std::{
+use alloc::slice;
+use core::{
     cell::RefCell,
-    error::Error,
     ffi::{c_char, c_int, CStr},
-    ptr, slice,
+    ptr,
 };
+// TODO: change to `core::error::Error` when stabilized.
+use std::error::Error;
 
 pub use steamid::{
-    AccountId, AccountNumber, AccountType, AuthServer, ChatFlags, Instance, SteamId, Universe,
+    AccountId, AccountNumber, AccountType, AuthServer, ChatFlags, Instance, RawSteamId, SteamId,
+    Universe,
 };
 
 /// The expected length of the steam2id representation of a `SteamId`.
@@ -470,8 +473,14 @@ mod tests {
 
         let output = assert.get_output();
         let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
 
         assert_eq!(&stdout, "");
+        assert_eq!(
+            &stderr, "",
+            "\n\n\n======= STDERR =======\n\n{}\n======================\n\n\n",
+            stderr
+        );
         assert_eq!(output.status.to_string().as_str(), "exit status: 0");
     }
 }

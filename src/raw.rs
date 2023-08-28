@@ -31,9 +31,10 @@ macro_rules! bitfields {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(From, Into)]
 #[repr(transparent)]
-pub struct SteamId(u64);
+#[allow(clippy::module_name_repetitions)]
+pub struct RawSteamId(u64);
 
-impl SteamId {
+impl RawSteamId {
     /// Construct a new `SteamId` from a [`u64`].
     #[inline]
     #[must_use]
@@ -71,7 +72,7 @@ impl SteamId {
 
 #[test]
 fn raw_sid_has_proper_values() {
-    let sid = SteamId::from(76_561_197_999_189_721);
+    let sid = RawSteamId::from(76_561_197_999_189_721);
 
     assert_eq!(1, sid.auth_server());
     assert_eq!(19_461_996, sid.account_number());
@@ -81,4 +82,9 @@ fn raw_sid_has_proper_values() {
     assert_eq!(1, sid.universe());
 
     assert_eq!(0, sid.chat_flags());
+
+    assert_eq!(
+        sid.with_instance(super::Instance::Web.into()),
+        RawSteamId::from(76_561_210_884_091_609)
+    );
 }

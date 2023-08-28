@@ -16,4 +16,4 @@ steamid = { path = "..", features = ["std"] }
 inline-c = "0.1"
 
 [build-dependencies]
-cbindgen = "0.24"
+cbindgen = "0.25"
