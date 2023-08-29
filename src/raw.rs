@@ -43,21 +43,26 @@ impl RawSteamId {
 forward_impl!(use new; impl From<u64> for RawSteamId);
 forward_impl!(use into_inner; impl Into<u64> for RawSteamId);
 
-#[test]
-fn raw_sid_has_proper_values() {
-    let sid = RawSteamId::from(76_561_197_999_189_721);
+#[cfg(test)]
+mod tests {
+    use super::RawSteamId;
 
-    assert_eq!(1, sid.auth_server());
-    assert_eq!(19_461_996, sid.account_number());
-    assert_eq!(38_923_993, sid.account_id());
-    assert_eq!(1, sid.instance());
-    assert_eq!(1, sid.account_type());
-    assert_eq!(1, sid.universe());
+    #[test]
+    fn raw_sid_has_proper_values() {
+        let sid = RawSteamId::from(76_561_197_999_189_721);
 
-    assert_eq!(0, sid.chat_flags());
+        assert_eq!(1, sid.auth_server());
+        assert_eq!(19_461_996, sid.account_number());
+        assert_eq!(38_923_993, sid.account_id());
+        assert_eq!(1, sid.instance());
+        assert_eq!(1, sid.account_type());
+        assert_eq!(1, sid.universe());
 
-    assert_eq!(
-        sid.with_instance(super::Instance::Web.into()),
-        RawSteamId::from(76_561_210_884_091_609)
-    );
+        assert_eq!(0, sid.chat_flags());
+
+        assert_eq!(
+            sid.with_instance(crate::Instance::Web.into_u32()),
+            RawSteamId::from(76_561_210_884_091_609)
+        );
+    }
 }

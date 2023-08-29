@@ -592,22 +592,18 @@ mod tests {
     use crate::{AccountType, ChatFlags, Instance, SteamId, Universe};
 
     #[test]
-    fn steamid_to_others() {
+    fn conversions() {
         let steamid = SteamId::new(76_561_197_999_189_721).unwrap();
         assert_eq!(steamid.steam2id(), "STEAM_1:1:19461996");
         assert_eq!(steamid.steam3id(), "[U:1:38923993]");
-    }
-
-    #[test]
-    fn steamid_from_steam2id() {
-        let steamid = SteamId::parse_steam2id("STEAM_1:1:19461996", None, None).unwrap();
-        assert_eq!(steamid, SteamId::new_unchecked(76_561_197_999_189_721));
-    }
-
-    #[test]
-    fn steamid_from_steam3id() {
-        let steamid = SteamId::parse_steam3id("[U:1:38923993]", None).unwrap();
-        assert_eq!(steamid, SteamId::new_unchecked(76_561_197_999_189_721));
+        assert_eq!(
+            SteamId::parse_steam2id(steamid.steam2id(), None, None).ok(),
+            Some(steamid)
+        );
+        assert_eq!(
+            SteamId::parse_steam3id(steamid.steam3id(), None).ok(),
+            Some(steamid)
+        );
     }
 
     #[test]
